@@ -1,4 +1,4 @@
-import os, math, time, subprocess, multiprocessing as mp
+import os, math
 import numpy as np
 import cairocffi as cairo
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -21,60 +21,77 @@ def ease_in_out_cubic(x: float) -> float:
     x = clamp(x)
     return 4 * x * x * x if x < 0.5 else 1.0 - ((-2 * x + 2) ** 3) / 2.0
 
-def window_fade(t: float, t0: float, t1: float, fi: float = 0.35, fo: float = 0.35) -> float:
+def spring_pop(x: float) -> float:
+    """Remotion-style damped spring (damping=13, stiffness=150) for snappy badges & frames."""
+    x = clamp(x)
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    return 1.0 - math.exp(-6.5 * x) * math.cos(9.5 * x)
+
+def window_fade(t: float, t0: float, t1: float, fi: float = 0.32, fo: float = 0.32) -> float:
     if t < t0 or t > t1:
         return 0.0
     a = clamp((t - t0) / fi) if fi > 0 else 1.0
     b = clamp((t1 - t) / fo) if fo > 0 else 1.0
     return ease_out_cubic(min(a, b))
 
+
 class FontBank:
     def __init__(self, font_dir: str):
-        self.light_24 = ImageFont.truetype(f"{font_dir}/Vazirmatn-Light.ttf", 24)
+        self.light_22 = ImageFont.truetype(f"{font_dir}/Vazirmatn-Light.ttf", 22)
         self.light_26 = ImageFont.truetype(f"{font_dir}/Vazirmatn-Light.ttf", 26)
-        self.reg_28   = ImageFont.truetype(f"{font_dir}/Vazirmatn-Regular.ttf", 28)
-        self.reg_32   = ImageFont.truetype(f"{font_dir}/Vazirmatn-Regular.ttf", 32)
-        self.med_34   = ImageFont.truetype(f"{font_dir}/Vazirmatn-Medium.ttf", 34)
-        self.med_38   = ImageFont.truetype(f"{font_dir}/Vazirmatn-Medium.ttf", 38)
-        self.med_42   = ImageFont.truetype(f"{font_dir}/Vazirmatn-Medium.ttf", 42)
+        self.reg_26   = ImageFont.truetype(f"{font_dir}/Vazirmatn-Regular.ttf", 26)
+        self.reg_30   = ImageFont.truetype(f"{font_dir}/Vazirmatn-Regular.ttf", 30)
+        self.reg_34   = ImageFont.truetype(f"{font_dir}/Vazirmatn-Regular.ttf", 34)
+        self.med_32   = ImageFont.truetype(f"{font_dir}/Vazirmatn-Medium.ttf", 32)
+        self.med_36   = ImageFont.truetype(f"{font_dir}/Vazirmatn-Medium.ttf", 36)
+        self.sub_40   = ImageFont.truetype(f"{font_dir}/Vazirmatn-Medium.ttf", 40) # Constant fixed subtitle font!
+        self.bold_30  = ImageFont.truetype(f"{font_dir}/Vazirmatn-Bold.ttf", 30)
         self.bold_36  = ImageFont.truetype(f"{font_dir}/Vazirmatn-Bold.ttf", 36)
         self.bold_44  = ImageFont.truetype(f"{font_dir}/Vazirmatn-Bold.ttf", 44)
         self.bold_52  = ImageFont.truetype(f"{font_dir}/Vazirmatn-Bold.ttf", 52)
         self.eb_68    = ImageFont.truetype(f"{font_dir}/Vazirmatn-ExtraBold.ttf", 68)
+        self.eb_84    = ImageFont.truetype(f"{font_dir}/Vazirmatn-ExtraBold.ttf", 84)
         self.eb_92    = ImageFont.truetype(f"{font_dir}/Vazirmatn-ExtraBold.ttf", 92)
 
+
 _SPRITE_CACHE = {}
+_SUB_PAIR_CACHE = {}
 
 def get_text_sprite(text: str, font, color=(255, 255, 255, 255), glow: float = 0.0) -> Image.Image:
+    """Metric-baseline-locked text sprite so typography never jitters vertically."""
     key = (text, id(font), color, round(glow, 2))
     if key in _SPRITE_CACHE:
         return _SPRITE_CACHE[key]
-    if len(_SPRITE_CACHE) > 120:
+    if len(_SPRITE_CACHE) > 140:
         _SPRITE_CACHE.clear()
 
     t_dir = "ltr" if text.isascii() else "rtl"
+    ascent, descent = font.getmetrics()
     dummy = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
     bbox = ImageDraw.Draw(dummy).textbbox((0, 0), text, font=font, direction=t_dir, language="fa")
-    pad = 34
-    tw = max(1, bbox[2] - bbox[0] + pad * 2)
-    th = max(1, bbox[3] - bbox[1] + pad * 2)
-    ox = pad - bbox[0]
-    oy = pad - bbox[1]
+    pad_x, pad_y = 32, 26
+    tw = max(1, bbox[2] - bbox[0] + pad_x * 2)
+    th = max(1, ascent + descent + pad_y * 2)
+    ox = pad_x - bbox[0]
+    oy = pad_y  # Pillow draws from top of ascent box -> constant baseline across all strings!
 
     fg = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
     ImageDraw.Draw(fg).text((ox, oy), text, font=font, fill=color, direction=t_dir, language="fa")
 
     if glow > 0.01:
-        ga = int(clamp(glow) * 215)
+        ga = int(clamp(glow) * 205)
         g_img = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
         ImageDraw.Draw(g_img).text((ox, oy), text, font=font, fill=(255, 255, 255, ga), direction=t_dir, language="fa")
-        g_blur = g_img.filter(ImageFilter.GaussianBlur(radius=14))
-        out = Image.alpha_composite(g_blur, fg)
+        out = Image.alpha_composite(g_img.filter(ImageFilter.GaussianBlur(radius=13)), fg)
     else:
         out = fg
 
     _SPRITE_CACHE[key] = out
     return out
+
 
 def paste_center(canvas: Image.Image, sprite: Image.Image, cx: float, cy: float, alpha: float = 1.0):
     if alpha <= 0.01:
@@ -87,10 +104,149 @@ def paste_center(canvas: Image.Image, sprite: Image.Image, cx: float, cy: float,
     y = int(round(cy - sprite.height / 2.0))
     canvas.alpha_composite(sprite, (x, y))
 
+
+def _get_subtitle_bitmap_pair(sub: dict, font):
+    """
+    Builds ONE single shaped HarfBuzz/Raqm line in two identical-geometry RGBA arrays
+    (dim gray & glowing white) + exact monotonic RTL wipe knot coordinates!
+    Guarantees 0.000px vertical/horizontal jitter and silky @ensan.besham gradient wipe.
+    """
+    full_fa = fa(sub["full"])
+    key = (full_fa, tuple(sub["times"]), tuple(sub.get("ends", [])))
+    if key in _SUB_PAIR_CACHE:
+        return _SUB_PAIR_CACHE[key]
+    if len(_SUB_PAIR_CACHE) > 40:
+        _SUB_PAIR_CACHE.clear()
+
+    ascent, descent = font.getmetrics()
+    dummy = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+    dd = ImageDraw.Draw(dummy)
+    bbox = dd.textbbox((0, 0), full_fa, font=font, direction="rtl", language="fa")
+
+    # Auto step-down only if an unusually wide phrase exceeds 940px
+    use_font = font
+    if (bbox[2] - bbox[0]) > 940:
+        use_font = ImageFont.truetype(font.path, 35)
+        ascent, descent = use_font.getmetrics()
+        bbox = dd.textbbox((0, 0), full_fa, font=use_font, direction="rtl", language="fa")
+
+    pad_x, pad_y = 44, 28
+    txt_w = bbox[2] - bbox[0]
+    tw = max(1, txt_w + pad_x * 2)
+    th = max(1, ascent + descent + pad_y * 2)
+    ox = pad_x - bbox[0]
+    oy = pad_y
+
+    # 1. Dim unspoken layer: exact @ensan.besham matte silver-charcoal rgba(255,255,255,0.26)
+    dim_im = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
+    ImageDraw.Draw(dim_im).text((ox, oy), full_fa, font=use_font, fill=(70, 70, 76, 255), direction="rtl", language="fa")
+
+    # 2. Lit spoken layer: crisp #FFFFFF + soft subtle @ensan.besham white bloom
+    lit_fg = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
+    ImageDraw.Draw(lit_fg).text((ox, oy), full_fa, font=use_font, fill=(252, 252, 255, 255), direction="rtl", language="fa")
+    lit_gl = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
+    ImageDraw.Draw(lit_gl).text((ox, oy), full_fa, font=use_font, fill=(255, 255, 255, 115), direction="rtl", language="fa")
+    lit_im = Image.alpha_composite(lit_gl.filter(ImageFilter.GaussianBlur(radius=9)), lit_fg)
+
+    # 3. Exact RTL cumulative word x-coordinates inside [pad_x .. pad_x + txt_w]
+    tokens_fa = [fa(tk) for tk in sub["tokens"]]
+    x_right = float(pad_x + txt_w)
+    x_left  = float(pad_x)
+
+    t_knots = [sub["times"][0] - 0.04]
+    x_knots = [x_right + 28.0]
+
+    ends = sub.get("ends") or [sub["times"][min(k+1, len(sub["times"])-1)] for k in range(len(tokens_fa))]
+    for k in range(len(tokens_fa)):
+        prefix_str = " ".join(tokens_fa[:k + 1])
+        pw = dd.textlength(prefix_str, font=use_font, direction="rtl", language="fa")
+        x_edge = max(x_left, x_right - pw)
+        if k == len(tokens_fa) - 1:
+            x_edge = x_left - 28.0
+        t_end_k = max(t_knots[-1] + 0.03, float(ends[k]))
+        t_knots.append(t_end_k)
+        x_knots.append(x_edge)
+
+    entry = {
+        "dim_arr": np.array(dim_im, dtype=np.float32),
+        "lit_arr": np.array(lit_im, dtype=np.float32),
+        "tw": tw,
+        "th": th,
+        "baseline_offset": oy + ascent,
+        "t_knots": np.array(t_knots, dtype=np.float64),
+        "x_knots": np.array(x_knots, dtype=np.float64),
+    }
+    _SUB_PAIR_CACHE[key] = entry
+    return entry
+
+
+def render_liquid_rtl_subtitle(canvas: Image.Image, t: float, sub_lines: list[dict], font):
+    """
+    Renders @ensan.besham-identical baseline-locked, sub-pixel feathered RTL gradient wipe subtitle.
+    """
+    active_sub = None
+    for sub in sub_lines:
+        if sub["start"] <= t <= sub["end"]:
+            active_sub = sub
+            break
+    if active_sub is None:
+        return
+
+    fi = clamp((t - active_sub["start"]) / 0.18)
+    fo = clamp((active_sub["end"] - t) / 0.16)
+    line_alpha = ease_out_cubic(min(fi, fo))
+    if line_alpha <= 0.01:
+        return
+
+    entry = _get_subtitle_bitmap_pair(active_sub, font)
+    # Smooth 5-point temporal micro-filter (+/- 35ms) so wipe velocity is pure liquid silk!
+    ts_probe = np.array([t - 0.035, t - 0.017, t, t + 0.017, t + 0.035])
+    wipe_x = float(np.mean(np.interp(ts_probe, entry["t_knots"], entry["x_knots"])))
+
+    # 1D horizontal feathered ramp (feather = 64px across active Persian word, matching @ensan.besham!)
+    feather = 64.0
+    xs = np.arange(entry["tw"], dtype=np.float32)
+    # Right of wipe_x => 1.0 (spoken white); Left of wipe_x => 0.0 (unspoken dim gray)
+    mask_1d = np.clip((xs - (wipe_x - feather * 0.5)) / feather, 0.0, 1.0)[None, :, None]
+
+    blended = entry["dim_arr"] * (1.0 - mask_1d) + entry["lit_arr"] * mask_1d
+    if line_alpha < 0.998:
+        blended[:, :, 3] *= line_alpha
+
+    sub_im = Image.fromarray(blended.astype(np.uint8), mode="RGBA")
+
+    # Constant fixed typographical baseline at y = 1642 (with subtle 4px upward float on entrance)
+    y_glide = (1.0 - ease_out_cubic(fi)) * 4.5
+    paste_x = int(round(W / 2.0 - entry["tw"] / 2.0))
+    paste_y = int(round(1642.0 - entry["baseline_offset"] + y_glide))
+    canvas.alpha_composite(sub_im, (paste_x, paste_y))
+
+
+# =============================================================================
+# @ensan.besham-GRADE VECTOR PRIMITIVES (Stroke-Draw, Camera, Humans, Pills, HUD)
+# =============================================================================
+
+def set_stroke_draw(ctx, progress: float, approx_len: float = 900.0):
+    p = clamp(progress)
+    if p >= 0.999:
+        ctx.set_dash([])
+    else:
+        ctx.set_dash([max(0.1, approx_len * p), approx_len * 2.0], 0)
+
+def rounded_rect_path(ctx, x: float, y: float, w: float, h: float, r: float):
+    r = min(r, w / 2.0, h / 2.0)
+    ctx.new_sub_path()
+    ctx.arc(x + w - r, y + r, r, -math.pi / 2, 0)
+    ctx.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
+    ctx.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
+    ctx.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+    ctx.close_path()
+
 def draw_star4(ctx, cx: float, cy: float, r: float, alpha: float = 1.0):
     if r <= 0.2 or alpha <= 0.01:
         return
     ctx.save()
+    ctx.set_dash([])
     ctx.translate(cx, cy)
     ctx.move_to(0, -r)
     ctx.curve_to(r * 0.16, -r * 0.16, r * 0.16, -r * 0.16, r, 0)
@@ -102,100 +258,359 @@ def draw_star4(ctx, cx: float, cy: float, r: float, alpha: float = 1.0):
     ctx.fill()
     ctx.restore()
 
-def draw_stipple_line(ctx, x0, y0, x1, y1, count: int, r: float = 1.8, alpha: float = 0.8):
+def draw_stipple_line(ctx, x0, y0, x1, y1, count: int, r: float = 1.7, alpha: float = 0.8):
     if count <= 0 or alpha <= 0.01:
         return
+    ctx.save()
+    ctx.set_dash([])
     ctx.set_source_rgba(1, 1, 1, alpha)
     for i in range(count + 1):
         u = i / max(1, count)
         ctx.arc(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, r, 0, 2 * math.pi)
         ctx.fill()
+    ctx.restore()
 
-def draw_hud_and_subtitles(
-    cs, cg, text_overlays: list, fonts: FontBank, t: float, total_dur: float,
-    ep_code: str, ep_title: str, chapter_starts: list[float], sub_lines: list[dict]
+def draw_human_figure(
+    ctx, cx: float, cy: float, scale: float = 1.0, alpha: float = 1.0,
+    draw_p: float = 1.0, lw: float = 2.2, vortex: bool = False, star_mind: bool = False, t: float = 0.0
 ):
     """
-    Renders:
-    1. Minimalist @ensan.besham-inspired HUD header at top ('زاویه ذهن | پرونده ۰۲ • توهم فرکانس')
-       + rotating astrolabe mind-angle mini-avatar at top-left!
-    2. Subtle chapter progress dots at y=1515 ('• • ⚪ • •')
-    3. Word-by-word RTL floating Karaoke subtitles at y=1615
+    Signature @ensan.besham geometric monoline human figure (Panels 1, 2, 3, 9, 10):
+    Clean circular head + architectural rounded shoulder-arm-torso silhouette + legs.
+    Origin (cx, cy) is at the feet (standing point on pedestal/ground)!
     """
-    hud_alpha = window_fade(t, 0.0, total_dur, fi=0.4, fo=0.8)
-    # Hide top HUD during final 3.5s full-screen brand lockup for pure visual impact
-    if len(chapter_starts) >= 2:
-        brand_fade = clamp((total_dur - 4.2 - t) / 0.6)
-        hud_alpha *= brand_fade
+    if alpha <= 0.01 or draw_p <= 0.01:
+        return
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.scale(scale, scale)
+    ctx.set_source_rgba(1, 1, 1, alpha)
+    ctx.set_line_width(lw / max(0.35, scale))
+    ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+    ctx.set_line_join(cairo.LINE_JOIN_ROUND)
 
-    if hud_alpha > 0.01:
-        # Top hairline divider & angled پرونده tab (y=118)
-        cs.set_source_rgba(1, 1, 1, 0.11 * hud_alpha)
-        cs.set_line_width(1.2)
-        cs.move_to(75, 134)
-        cs.line_to(650, 134)
-        cs.line_to(674, 110)
-        cs.line_to(1005, 110)
+    # Head circle (center at 0, -148, r=22)
+    set_stroke_draw(ctx, draw_p, 160.0)
+    ctx.arc(0, -148, 22, 0, 2 * math.pi)
+    ctx.stroke()
+
+    # Architectural rounded shoulders + outer arms + inner torso + legs (exact @ensan.besham silhouette!)
+    set_stroke_draw(ctx, draw_p, 520.0)
+    ctx.move_to(-18, -118)
+    ctx.curve_to(-36, -118, -42, -104, -42, -86)
+    ctx.line_to(-42, -46)
+    ctx.line_to(-30, -46)
+    ctx.line_to(-30, -84)
+    ctx.move_to(-26, -84)
+    ctx.line_to(-26, 0)
+    ctx.line_to(-6, 0)
+    ctx.line_to(-6, -52)
+    ctx.line_to(6, -52)
+    ctx.line_to(6, 0)
+    ctx.line_to(26, 0)
+    ctx.line_to(26, -84)
+    ctx.move_to(30, -84)
+    ctx.line_to(30, -46)
+    ctx.line_to(42, -46)
+    ctx.line_to(42, -86)
+    ctx.curve_to(42, -104, 36, -118, 18, -118)
+    ctx.close_path()
+    ctx.stroke()
+
+    ctx.set_dash([])
+    if vortex:
+        # Concentric spiral rings inside head (Panel 4 homage!)
+        for ri in (6, 11, 16):
+            ctx.arc(0, -148, ri, t * 2.5 + ri, t * 2.5 + ri + math.pi * 1.45)
+            ctx.stroke()
+    if star_mind:
+        draw_star4(ctx, 0, -148, 10, alpha)
+
+    ctx.restore()
+
+
+def draw_pill_badge(
+    cs, cg, text_overlays: list, text: str, cx: float, cy: float,
+    font, alpha: float = 1.0, glow: bool = False, pad_x: float = 26.0, pad_y: float = 11.0
+):
+    """Exact @ensan.besham bordered pill tag ([ ۱۳۹۷ ], [ لیست ویژه ], [ پرونده ۰۲ ])."""
+    if alpha <= 0.01:
+        return
+    sp = get_text_sprite(fa(text), font, (250, 250, 255, 255) if glow else (210, 210, 220, 255), glow=0.55 if glow else 0.0)
+    # Estimate clean pill box around text
+    dummy = Image.new("RGBA", (4, 4))
+    t_dir = "ltr" if text.isascii() else "rtl"
+    bb = ImageDraw.Draw(dummy).textbbox((0, 0), fa(text), font=font, direction=t_dir, language="fa")
+    bw = (bb[2] - bb[0]) + pad_x * 2
+    bh = (bb[3] - bb[1]) + pad_y * 2
+
+    cs.save()
+    cs.set_dash([])
+    rounded_rect_path(cs, cx - bw / 2, cy - bh / 2, bw, bh, 9.0)
+    cs.set_source_rgba(0.02, 0.02, 0.03, 0.92 * alpha)
+    cs.fill_preserve()
+    cs.set_source_rgba(1, 1, 1, (0.82 if glow else 0.34) * alpha)
+    cs.set_line_width(2.0 if glow else 1.4)
+    cs.stroke()
+    cs.restore()
+
+    if glow:
+        cg.save()
+        rounded_rect_path(cg, cx - bw / 2, cy - bh / 2, bw, bh, 9.0)
+        cg.set_source_rgba(1, 1, 1, 0.55 * alpha)
+        cg.set_line_width(4.5)
+        cg.stroke()
+        cg.restore()
+
+    text_overlays.append((sp, cx, cy, alpha))
+
+
+def draw_folder_window(
+    cs, cg, text_overlays: list, cx: float, cy: float, w: float, h: float,
+    tab_label: str, font_tab, alpha: float = 1.0, draw_p: float = 1.0
+):
+    """
+    Signature @ensan.besham chamfered folder-tab HUD window (Panel 7 '[ انسان ]' card!).
+    """
+    if alpha <= 0.01 or draw_p <= 0.01:
+        return
+    x0, y0 = cx - w / 2.0, cy - h / 2.0
+    x1, y1 = cx + w / 2.0, cy + h / 2.0
+    dummy_tb = Image.new("RGBA", (4, 4))
+    bb_tb = ImageDraw.Draw(dummy_tb).textbbox((0, 0), fa(tab_label), font=font_tab, direction="rtl", language="fa")
+    tab_w = max(175.0, float(bb_tb[2] - bb_tb[0]) + 58.0)
+    tab_h = 42.0
+
+    for ctx, lw, al in ((cs, 2.0, alpha * 0.78), (cg, 4.5, alpha * 0.32)):
+        ctx.save()
+        set_stroke_draw(ctx, draw_p, (w + h) * 2.2)
+        ctx.set_source_rgba(1, 1, 1, al)
+        ctx.set_line_width(lw)
+        ctx.move_to(x0, y0)
+        ctx.line_to(x1 - tab_w - 22, y0)
+        ctx.line_to(x1 - tab_w, y0 - tab_h)
+        ctx.line_to(x1, y0 - tab_h)
+        ctx.line_to(x1, y1)
+        ctx.line_to(x0, y1)
+        ctx.close_path()
+        ctx.stroke()
+        # Subtle inner top divider under tab
+        ctx.set_dash([])
+        ctx.set_source_rgba(1, 1, 1, al * 0.25)
+        ctx.set_line_width(1.1)
+        ctx.move_to(x0, y0 + 2); ctx.line_to(x1, y0 + 2); ctx.stroke()
+        ctx.restore()
+
+    if draw_p > 0.35:
+        sp_tb = get_text_sprite(fa(tab_label), font_tab, (235, 235, 242, 255), glow=0.25)
+        text_overlays.append((sp_tb, x1 - tab_w / 2.0, y0 - tab_h / 2.0 + 2, alpha * clamp((draw_p - 0.35) / 0.4)))
+
+
+def draw_stamp_badge(
+    cs, cg, text_overlays: list, text: str, cx: float, cy: float,
+    angle_deg: float, font, alpha: float = 1.0, pop_p: float = 1.0
+):
+    """Double-bordered angled stamp badge ('[ انجام دادید ]' from Panel 7!) with spring impact."""
+    if alpha <= 0.01 or pop_p <= 0.01:
+        return
+    sc = 1.32 - 0.32 * spring_pop(pop_p)
+    dummy = Image.new("RGBA", (4, 4))
+    bb = ImageDraw.Draw(dummy).textbbox((0, 0), fa(text), font=font, direction="rtl", language="fa")
+    bw = (bb[2] - bb[0]) + 62
+    bh = (bb[3] - bb[1]) + 30
+
+    for ctx, lw, al in ((cs, 2.4, alpha * 0.96), (cg, 5.5, alpha * 0.72)):
+        ctx.save()
+        ctx.set_dash([])
+        ctx.translate(cx, cy)
+        ctx.rotate(math.radians(angle_deg))
+        ctx.scale(sc, sc)
+        if ctx is cs:
+            ctx.rectangle(-bw/2, -bh/2, bw, bh)
+            ctx.set_source_rgba(0, 0, 0, 0.96 * alpha)
+            ctx.fill()
+        ctx.set_source_rgba(1, 1, 1, al)
+        ctx.set_line_width(lw)
+        ctx.rectangle(-bw/2, -bh/2, bw, bh)
+        ctx.stroke()
+        ctx.set_line_width(lw * 0.5)
+        ctx.rectangle(-bw/2 + 6, -bh/2 + 6, bw - 12, bh - 12)
+        ctx.stroke()
+        ctx.restore()
+
+    sp = get_text_sprite(fa(text), font, (255, 255, 255, 255), glow=0.65)
+    sp_rot = sp.rotate(-angle_deg, resample=Image.Resampling.BICUBIC, expand=True)
+    text_overlays.append((sp_rot, cx, cy, alpha * clamp(pop_p * 1.8)))
+
+
+def draw_tehran_skyline(cs, cg, y_base: float, alpha: float = 1.0, draw_p: float = 1.0):
+    """
+    @ensan.besham Panel 4 homage: Alborz mountain ridge + Azadi Tower (left) + Milad Tower (right) + skyline blocks!
+    """
+    if alpha <= 0.01 or draw_p <= 0.01:
+        return
+    cs.save()
+    # 1. Alborz mountain ridgeline in delicate ghost silver
+    set_stroke_draw(cs, draw_p, 1100.0)
+    cs.set_source_rgba(1, 1, 1, alpha * 0.28)
+    cs.set_line_width(1.3)
+    pts_mtn = [(60, y_base-35), (190, y_base-105), (310, y_base-68), (470, y_base-145),
+               (620, y_base-85), (775, y_base-155), (915, y_base-95), (1020, y_base-40)]
+    cs.move_to(*pts_mtn[0])
+    for px, py in pts_mtn[1:]:
+        cs.line_to(px, py)
+    cs.stroke()
+
+    # 2. Azadi Tower silhouette on left (cx=235)
+    az_x = 235.0
+    for ctx, lw, al in ((cs, 2.1, alpha * 0.80), (cg, 4.2, alpha * 0.34)):
+        set_stroke_draw(ctx, draw_p, 420.0)
+        ctx.set_source_rgba(1, 1, 1, al)
+        ctx.set_line_width(lw)
+        ctx.move_to(az_x - 42, y_base)
+        ctx.curve_to(az_x - 32, y_base - 55, az_x - 24, y_base - 92, az_x - 22, y_base - 115)
+        ctx.line_to(az_x + 22, y_base - 115)
+        ctx.curve_to(az_x + 24, y_base - 92, az_x + 32, y_base - 55, az_x + 42, y_base)
+        ctx.stroke()
+        # Inner Azadi arch
+        ctx.move_to(az_x - 24, y_base)
+        ctx.curve_to(az_x - 16, y_base - 56, az_x + 16, y_base - 56, az_x + 24, y_base)
+        ctx.stroke()
+
+    # 3. City apartment blocks across horizon
+    cs.set_source_rgba(1, 1, 1, alpha * 0.46)
+    cs.set_line_width(1.7)
+    blocks = [(95, 52, 48), (310, 58, 64), (382, 48, 42), (455, 66, 78), (545, 54, 52), (620, 62, 70), (705, 50, 46), (900, 64, 62)]
+    for bx, bw, bh in blocks:
+        set_stroke_draw(cs, draw_p, 260.0)
+        cs.rectangle(bx, y_base - bh, bw, bh)
         cs.stroke()
 
-        sp_ep = get_text_sprite(fa(f"{ep_code}  •  {ep_title}"), fonts.reg_28, (225, 225, 232, 255), glow=0.25)
-        text_overlays.append((sp_ep, 840, 84, hud_alpha * 0.92))
+    # 4. Iconic Milad Tower on right (cx=825)
+    mx = 825.0
+    for ctx, lw, al in ((cs, 2.2, alpha * 0.90), (cg, 4.8, alpha * 0.42)):
+        set_stroke_draw(ctx, draw_p, 520.0)
+        ctx.set_source_rgba(1, 1, 1, al)
+        ctx.set_line_width(lw)
+        # Tapered shaft
+        ctx.move_to(mx - 14, y_base); ctx.line_to(mx - 5, y_base - 135)
+        ctx.move_to(mx + 14, y_base); ctx.line_to(mx + 5, y_base - 135)
+        ctx.stroke()
+        # Gondola head pod
+        ctx.move_to(mx - 22, y_base - 152)
+        ctx.line_to(mx - 10, y_base - 135); ctx.line_to(mx + 10, y_base - 135); ctx.line_to(mx + 22, y_base - 152)
+        ctx.line_to(mx + 12, y_base - 170); ctx.line_to(mx - 12, y_base - 170)
+        ctx.close_path()
+        ctx.stroke()
+        # Antenna spire
+        ctx.move_to(mx, y_base - 170); ctx.line_to(mx, y_base - 215); ctx.stroke()
 
-        # Top-left rotating Observatory Mind-Angle Mini-Avatar (cx=128, cy=96)
-        ax, ay = 128, 96
-        cs.set_source_rgba(1, 1, 1, 0.32 * hud_alpha)
-        cs.set_line_width(1.3)
-        cs.arc(ax, ay, 28, 0, 2 * math.pi)
-        cs.stroke()
-        # Counter-rotating tick ring
-        for k in range(12):
-            ang = k * (math.pi / 6.0) - t * 0.45
-            cs.move_to(ax + math.cos(ang) * 33, ay + math.sin(ang) * 33)
-            cs.line_to(ax + math.cos(ang) * 37, ay + math.sin(ang) * 37)
-            cs.stroke()
-        # Perspective angle rays inside mini-avatar
-        cs.set_source_rgba(1, 1, 1, 0.90 * hud_alpha)
-        cs.set_line_width(1.8)
-        cs.move_to(ax + 8, ay + 4); cs.line_to(ax - 15, ay - 11); cs.stroke()
-        cs.set_source_rgba(1, 1, 1, 0.50 * hud_alpha)
-        cs.move_to(ax + 8, ay + 4); cs.line_to(ax - 15, ay + 12); cs.stroke()
-        draw_star4(cs, ax + 8, ay + 4, 5.5, hud_alpha)
-        draw_star4(cg, ax + 8, ay + 4, 8.5, hud_alpha * 0.75)
+    cs.set_dash([])
+    cs.set_source_rgba(1, 1, 1, alpha * 0.48)
+    cs.set_line_width(1.4)
+    cs.move_to(60, y_base); cs.line_to(1020, y_base); cs.stroke()
+    cs.restore()
 
-        # Chapter progress dots at y=1518 (RTL order: chapter 0 on right -> last on left)
-        n_ch = len(chapter_starts)
-        cur_ch = 0
-        for ci, cs_t in enumerate(chapter_starts):
-            if t >= cs_t:
-                cur_ch = ci
-        dot_gap = 24.0
-        right_x = 540 + (n_ch - 1) * dot_gap / 2.0
-        for ci in range(n_ch):
-            dx = right_x - ci * dot_gap
-            dy = 1520
-            if ci == cur_ch:
-                cs.arc(dx, dy, 4.8, 0, 2 * math.pi)
-                cs.set_source_rgba(1, 1, 1, 0.96 * hud_alpha)
-                cs.fill()
-                cg.arc(dx, dy, 8.5, 0, 2 * math.pi)
-                cg.set_source_rgba(1, 1, 1, 0.80 * hud_alpha)
-                cg.fill()
-            elif ci < cur_ch:
-                cs.arc(dx, dy, 3.0, 0, 2 * math.pi)
-                cs.set_source_rgba(1, 1, 1, 0.45 * hud_alpha)
-                cs.fill()
-            else:
-                cs.arc(dx, dy, 2.6, 0, 2 * math.pi)
-                cs.set_source_rgba(1, 1, 1, 0.16 * hud_alpha)
-                cs.fill()
+
+def draw_spotlight_cone(cs, cg, ax: float, ay: float, x_left: float, x_right: float, y_target: float, alpha: float = 1.0):
+    """@ensan.besham Panel 9 translucent spotlight beam + crisp edge rays."""
+    if alpha <= 0.01:
+        return
+    cs.save()
+    cs.set_dash([])
+    pat = cairo.LinearGradient(ax, ay, 0.5 * (x_left + x_right), y_target)
+    pat.add_color_stop_rgba(0.0, 1, 1, 1, 0.16 * alpha)
+    pat.add_color_stop_rgba(0.7, 1, 1, 1, 0.05 * alpha)
+    pat.add_color_stop_rgba(1.0, 1, 1, 1, 0.00)
+    cs.move_to(ax, ay)
+    cs.line_to(x_left, y_target)
+    cs.line_to(x_right, y_target)
+    cs.close_path()
+    cs.set_source(pat)
+    cs.fill()
+
+    for ctx, lw, al in ((cs, 2.0, alpha * 0.78), (cg, 4.5, alpha * 0.45)):
+        ctx.set_source_rgba(1, 1, 1, al)
+        ctx.set_line_width(lw)
+        ctx.move_to(ax, ay); ctx.line_to(x_left, y_target); ctx.stroke()
+        ctx.move_to(ax, ay); ctx.line_to(x_right, y_target); ctx.stroke()
+    cs.restore()
+
+
+def draw_hud_chrome(
+    cs, cg, text_overlays: list, fonts: FontBank, t: float, total_dur: float,
+    ep_code: str, ep_title: str, chapter_starts: list[float]
+):
+    hud_alpha = window_fade(t, 0.0, total_dur, fi=0.35, fo=0.6)
+    brand_fade = clamp((total_dur - 4.0 - t) / 0.55)
+    hud_alpha *= brand_fade
+    if hud_alpha <= 0.01:
+        return
+
+    # Exact @ensan.besham angled پرونده tab at top right + rotating AI/Observatory eye at top left
+    cs.save()
+    cs.set_dash([])
+    cs.set_source_rgba(1, 1, 1, 0.14 * hud_alpha)
+    cs.set_line_width(1.2)
+    cs.move_to(70, 128)
+    cs.line_to(665, 128)
+    cs.line_to(690, 102)
+    cs.line_to(1010, 102)
+    cs.stroke()
+    cs.restore()
+
+    sp_lbl = get_text_sprite("پرونده", fonts.light_22, (135, 135, 145, 255))
+    sp_val = get_text_sprite(fa(ep_title), fonts.bold_30, (245, 245, 250, 255), glow=0.35)
+    text_overlays.append((sp_lbl, 962, 76, hud_alpha * 0.85))
+    text_overlays.append((sp_val, 805, 76, hud_alpha * 0.95))
+
+    # Top-left Observatory Dual Counter-Rotating Dotted Rings + Mind Angle
+    ax, ay = 128, 92
+    cs.save()
+    cs.set_dash([])
+    for k in range(16):
+        ang = k * (math.pi / 8.0) + t * 0.55
+        cs.arc(ax + math.cos(ang) * 32, ay + math.sin(ang) * 32, 1.3, 0, 2 * math.pi)
+        cs.set_source_rgba(1, 1, 1, 0.42 * hud_alpha); cs.fill()
+    for k in range(12):
+        ang = k * (math.pi / 6.0) - t * 0.75
+        cs.move_to(ax + math.cos(ang) * 38, ay + math.sin(ang) * 38)
+        cs.line_to(ax + math.cos(ang) * 43, ay + math.sin(ang) * 43)
+        cs.set_source_rgba(1, 1, 1, 0.28 * hud_alpha); cs.set_line_width(1.2); cs.stroke()
+    cs.set_source_rgba(1, 1, 1, 0.92 * hud_alpha); cs.set_line_width(1.9)
+    cs.move_to(ax + 9, ay + 4); cs.line_to(ax - 15, ay - 11); cs.stroke()
+    cs.set_source_rgba(1, 1, 1, 0.48 * hud_alpha)
+    cs.move_to(ax + 9, ay + 4); cs.line_to(ax - 15, ay + 12); cs.stroke()
+    draw_star4(cs, ax + 9, ay + 4, 5.5, hud_alpha)
+    draw_star4(cg, ax + 9, ay + 4, 9.0, hud_alpha * 0.8)
+    cs.restore()
+
+    # Bottom Chapter Progress Dots at y = 1538 (exact @ensan.besham spacing!)
+    n_ch = len(chapter_starts)
+    cur_ch = 0
+    for ci, cs_t in enumerate(chapter_starts):
+        if t >= cs_t:
+            cur_ch = ci
+    dot_gap = 22.0
+    right_x = 540.0 + (n_ch - 1) * dot_gap / 2.0
+    for ci in range(n_ch):
+        dx = right_x - ci * dot_gap
+        dy = 1538.0
+        if ci == cur_ch:
+            cs.arc(dx, dy, 4.6, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.96 * hud_alpha); cs.fill()
+            cg.arc(dx, dy, 8.5, 0, 2 * math.pi); cg.set_source_rgba(1, 1, 1, 0.80 * hud_alpha); cg.fill()
+        elif ci < cur_ch:
+            cs.arc(dx, dy, 2.8, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.42 * hud_alpha); cs.fill()
+        else:
+            cs.arc(dx, dy, 2.4, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.16 * hud_alpha); cs.fill()
+
 
 def composite_oled_frame(surf_glow, surf_sharp, text_overlays: list, fonts: FontBank, t: float, sub_lines: list[dict]) -> bytes:
     buf_g = np.frombuffer(surf_glow.get_data(), dtype=np.uint8).reshape((H, W, 4))
     img_g = Image.fromarray(buf_g[:, :, [2, 1, 0, 3]], mode="RGBA")
 
-    # Dual-pass After-Effects-style Deep Glow Halation
     small_g = img_g.resize((W // 4, H // 4), Image.Resampling.BILINEAR)
-    bloom_wide = small_g.filter(ImageFilter.GaussianBlur(radius=7.8)).resize((W, H), Image.Resampling.BILINEAR)
+    bloom_wide = small_g.filter(ImageFilter.GaussianBlur(radius=8.0)).resize((W, H), Image.Resampling.BILINEAR)
     bloom_core = small_g.filter(ImageFilter.GaussianBlur(radius=2.3)).resize((W, H), Image.Resampling.BILINEAR)
 
     buf_s = np.frombuffer(surf_sharp.get_data(), dtype=np.uint8).reshape((H, W, 4))
@@ -209,57 +624,6 @@ def composite_oled_frame(surf_glow, surf_sharp, text_overlays: list, fonts: Font
     for sp, cx, cy, al in text_overlays:
         paste_center(canvas, sp, cx, cy, al)
 
-    # Floating RTL Karaoke Subtitles (y = 1618)
-    active_sub = None
-    for sub in sub_lines:
-        if sub["start"] <= t <= sub["end"]:
-            active_sub = sub
-            break
-
-    if active_sub is not None:
-        sub_al = clamp(min((t - active_sub["start"]) / 0.12, (active_sub["end"] - t) / 0.16))
-        tokens = active_sub["tokens"]
-        times  = active_sub["times"]
-
-        cur_k = 0
-        for k, ts in enumerate(times):
-            if t >= ts - 0.03:
-                cur_k = k
-
-        full_txt = fa(active_sub["full"])
-        if len(full_txt) <= 36:
-            f_sub = fonts.med_42
-        elif len(full_txt) <= 46:
-            f_sub = fonts.med_38
-        else:
-            f_sub = fonts.med_34
-
-        dd = ImageDraw.Draw(canvas)
-        sp_w = dd.textlength(" ", font=f_sub, direction="rtl", language="fa")
-        tok_fa = [fa(tok) for tok in tokens]
-        tok_w  = [dd.textlength(tok, font=f_sub, direction="rtl", language="fa") for tok in tok_fa]
-        total_w = sum(tok_w) + sp_w * max(0, len(tok_fa) - 1)
-
-        # Safety scale if line exceeds 940px
-        if total_w > 940 and f_sub is not fonts.med_34:
-            f_sub = fonts.med_34
-            sp_w = dd.textlength(" ", font=f_sub, direction="rtl", language="fa")
-            tok_w = [dd.textlength(tok, font=f_sub, direction="rtl", language="fa") for tok in tok_fa]
-            total_w = sum(tok_w) + sp_w * max(0, len(tok_fa) - 1)
-
-        cur_right = 540.0 + total_w / 2.0
-        sub_y = 1618
-
-        for k, (tk, tw) in enumerate(zip(tok_fa, tok_w)):
-            cx_tok = cur_right - tw / 2.0
-            if k < cur_k:
-                col, glw = (242, 242, 246, 255), 0.0
-            elif k == cur_k:
-                col, glw = (255, 255, 255, 255), 0.70
-            else:
-                col, glw = (76, 76, 84, 255), 0.0
-            sp_tk = get_text_sprite(tk, f_sub, col, glow=glw)
-            paste_center(canvas, sp_tk, cx_tok, sub_y, sub_al)
-            cur_right -= (tw + sp_w)
+    render_liquid_rtl_subtitle(canvas, t, sub_lines, fonts.sub_40)
 
     return canvas.convert("RGB").tobytes()

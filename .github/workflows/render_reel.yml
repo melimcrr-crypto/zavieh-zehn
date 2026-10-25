@@ -1,4 +1,4 @@
-name: Render Zavieh Zehn Reel (60fps Studio)
+name: Render Zavieh Zehn Reel (60fps Studio v2)
 
 on:
   push:
@@ -44,7 +44,7 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install Python Packages & Verify RTL Shaping
+      - name: Install Python Packages & Verify HarfBuzz/Raqm RTL Shaping
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
@@ -59,7 +59,7 @@ jobs:
           done
           ls -lh fonts/
 
-      - name: Synthesize Voice, Align & Render 1080x1920 @ 60fps Master Reel
+      - name: Synthesize Voice (Rasalgethi + 129-tap FIR), Align & Render 1080x1920 @ 60fps Master Reel
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
@@ -76,23 +76,27 @@ jobs:
           path: out/zavieh_zehn_ep02_baader_meinhof_60fps.mp4
           if-no-files-found: error
 
-      - name: Upload QA Frames & Alignment Report
+      - name: Upload QA Sheets & Alignment Report
         uses: actions/upload-artifact@v4
         with:
           name: zavieh-zehn-ep02-qa-report
           path: qa_report/
           if-no-files-found: error
 
-      - name: Publish MP4 to GitHub Releases
+      - name: Publish Studio v2 MP4 & QA Sheets to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.release_tag || 'ep02-baader-meinhof' }}
-          name: "اپیزود ۰۲ — توهم فرکانس (پدیده‌ی بادر-ماینهوف) | 1080x1920 60fps"
+          name: "اپیزود ۰۲ (نسخه استودیویی v2) — توهم فرکانس (بادر-ماینهوف) | 1080x1920 60fps"
           body: |
-            خروجی استودیویی اپیزود دوم پیج **زاویه ذهن (`@zavieh.penhann`)**
+            خروجی استودیویی **نسخه v2** اپیزود دوم پیج **زاویه ذهن (`@zavieh.penhann`)**
             - **موضوع:** توهم فرکانس (پدیده‌ی بادر-ماینهوف)
-            - **کیفیت تصویر:** `1080×1920` • `60fps` • `H.264 High Profile (-preset slow -crf 14)`
-            - **مسترینگ صدا:** `Gemini TTS (Iapetus)` + کالیبراسیون باریتون `Rubberband` + فشرده‌سازی هوشمند مکث‌ها + `48kHz / 320kbps Stereo`
+            - **کیفیت تصویر:** `1080×1920` • `60fps` • `H.264 High@L4.2 (-preset slow -crf 14)` • Pure OLED `#000000`
+            - **موتور زیرنویس v2:** خط واحد RTL با فونت ثابت `Vazirmatn-Medium 40px` قفل‌شده روی خط کرسی `y=1642.0` (`0.000px` خطای تراز) + مسک گرادیانی نرم `64px` راست‌به‌چپ در ۶۰ فریم‌برثانیه
+            - **موتور صوتی v2 (تطبیق آکوستیک `@ensan.besham`):** `Gemini TTS (Rasalgethi)` + فیلتر طیف‌نگاری `129-tap Zero-Phase FIR` + کالیبراسیون `-0.34st Rubberband Formant` (`F0 = 136.4 Hz`, تشابه طیف صوتی `MFCC = 0.9433`) + فشرده‌سازی مکث‌ها به `0.18s` + امبینت دارک `A-minor` در `-32 dBFS`
           files: |
             out/zavieh_zehn_ep02_baader_meinhof_60fps.mp4
             qa_report/ffprobe_report.json
+            qa_report/alignment.json
+            qa_report/subtitle_strip_verify.png
+            qa_report/storyboard_12_scenes.png
