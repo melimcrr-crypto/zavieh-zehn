@@ -1,7 +1,6 @@
 import os, re, json, time, wave, base64, difflib, subprocess, urllib.request, urllib.error
 import numpy as np
 from scipy.signal import butter, lfilter, filtfilt
-from faster_whisper import WhisperModel
 
 SR = 48000
 
@@ -197,8 +196,10 @@ def calibrate_baritone_and_tighten(raw_wav: str, tightened_wav: str, dramatic_fr
 
 
 _NUM_WORDS_FA = sorted([
+    ("600", "ششصد"), ("۶۰۰", "ششصد"),
     ("512", "پانصدودوازده"), ("۵۱۲", "پانصدودوازده"),
     ("256", "دویستوپنجاهوشش"), ("۲۵۶", "دویستوپنجاهوشش"),
+    ("180", "صدوهشتاد"), ("۱۸۰", "صدوهشتاد"),
     ("150", "صدوپنجاه"), ("۱۵۰", "صدوپنجاه"),
     ("135", "صدوسیوپنج"), ("۱۳۵", "صدوسیوپنج"),
     ("128", "صدوبیستوهشت"), ("۱۲۸", "صدوبیستوهشت"),
@@ -206,18 +207,25 @@ _NUM_WORDS_FA = sorted([
     ("99", "نودونه"), ("۹۹", "نودونه"),
     ("90", "نود"), ("۹۰", "نود"),
     ("84", "هشتادوچهار"), ("۸۴", "هشتادوچهار"),
+    ("75", "هفتادوپنج"), ("۷۵", "هفتادوپنج"),
     ("68", "شصتوهشت"), ("۶۸", "شصتوهشت"),
     ("60", "شصت"), ("۶۰", "شصت"),
     ("50", "پنجاه"), ("۵۰", "پنجاه"),
     ("40", "چهل"), ("۴۰", "چهل"),
     ("32", "سیودو"), ("۳۲", "سیودو"),
+    ("30", "سی"), ("۳۰", "سی"),
     ("28", "بیستوهشت"), ("۲۸", "بیستوهشت"),
     ("25", "بیستوپنج"), ("۲۵", "بیستوپنج"),
+    ("24", "بیستوچهار"), ("۲۴", "بیستوچهار"),
     ("20", "بیست"), ("۲۰", "بیست"),
     ("15", "پونزده"), ("۱۵", "پونزده"),
+    ("12", "دوازده"), ("۱۲", "دوازده"),
     ("11", "یازده"), ("۱۱", "یازده"),
     ("10", "ده"), ("۱۰", "ده"),
+    ("9", "نه"), ("۹", "نه"),
     ("8", "هشت"), ("۸", "هشت"),
+    ("7", "هفت"), ("۷", "هفت"),
+    ("6", "شش"), ("۶", "شش"),
     ("5", "پنج"), ("۵", "پنج"),
     ("4", "چهار"), ("۴", "چهار"),
     ("3", "سه"), ("۳", "سه"),
@@ -228,6 +236,7 @@ _NUM_WORDS_FA = sorted([
 
 def _norm_fa(s: str) -> str:
     s = s.replace("ي", "ی").replace("ك", "ک").replace("ة", "ه").replace("ؤ", "و").replace("إ", "ا").replace("أ", "ا").replace("آ", "ا")
+    s = s.replace("شیشصد", "ششصد").replace("شیش", "شش")
     for k_num, v_word in _NUM_WORDS_FA:
         s = s.replace(k_num, v_word)
     s = re.sub(r"[^\u0621-\u06cc0-9۰-۹]", "", s)
@@ -245,6 +254,7 @@ def align_script_lines(tightened_wav: str, script_lines: list[str], whisper_size
     audio_16k = np.frombuffer(raw_16k, dtype=np.float32)
     total_dur = len(audio_16k) / 16000.0
 
+    from faster_whisper import WhisperModel
     wm = WhisperModel(whisper_size, device="cpu", compute_type="int8")
     segs, _ = wm.transcribe(audio_16k, language="fa", word_timestamps=True, vad_filter=False)
     w_words = [w for s in segs for w in s.words]
@@ -342,9 +352,13 @@ def align_script_lines(tightened_wav: str, script_lines: list[str], whisper_size
 
 def build_master_stereo_mix(tightened_wav: str, out_master_wav: str, sfx_events: list[dict]) -> None:
     """
-    Combines 48kHz Rasalgethi spectral-matched voiceover with:
-    - -32 dBFS A-minor / D-minor dark existential ambient drone (@ensan.besham spectral match)
-    - Subtle micro UI clicks, soft air whooshes on camera zooms, and crystalline brand chime
+    Studio v3.0 Hypnotic Neoclassical & Horology Master Mix (48kHz Stereo):
+    Combines locked Rasalgethi spectral-matched voiceover with:
+    1. Warm Analog Cello & Sub-Bass Progression (Dmadd9 -> Bbmaj7#11 -> Gm9 -> Asus4/A7b9, audible on phone speakers)
+    2. Hypnotic 120-BPM Polyrhythmic Felt-Piano Ostinato (8th-note Zimmer/Arnalds motif + 6-tap concert hall reverb)
+    3. Precision Swiss Watch Escapement Stereo Tick-Tock + Visceral Lub-Dub Heartbeat Sub-Pulse
+    4. Act III Ethereal Bowed-Glass High String Shimmer + Speech-Pocket Presence Protection
+    5. Synchronized Kinetic Editing Micro-SFX (tick, heartbeat, scan, shatter, click, whoosh, ping, stamp, chime)
     """
     with wave.open(tightened_wav, "rb") as wf:
         vo = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
@@ -353,26 +367,47 @@ def build_master_stereo_mix(tightened_wav: str, out_master_wav: str, sfx_events:
     dur = N / SR
     t = np.arange(N, dtype=np.float32) / SR
 
-    # Smooth broadcast sidechain envelope: ducks score cleanly while Rasalgethi speaks,
-    # and gently blooms during dramatic pauses & the 4.0s @zavieh.penhann outro!
-    vo_env_fast = lfilter(*butter(1, 2.2 / (SR / 2), btype="low"), np.abs(vo))
-    duck = np.clip(1.0 - 2.4 * vo_env_fast, 0.48, 1.0).astype(np.float32)
+    # Smooth broadcast sidechain envelope: keeps voice crystal-clear while letting music breathe between phrases & bloom on outro
+    vo_env_fast = lfilter(*butter(1, 2.0 / (SR / 2), btype="low"), np.abs(vo))
+    duck = np.clip(1.0 - 2.35 * vo_env_fast, 0.45, 1.0).astype(np.float32)
 
-    # Dark-Cinematic Evolving Score (Minimalist Minor Progression: Am9 -> Fmaj7 -> Dm9 -> Em7)
+    # Hypnotic D-minor Neoclassical Progression (120 BPM -> 4.0s per 8-beat bar):
+    # (bass_hz, cello_pad_freqs, 8_step_felt_piano_ostinato_freqs, shimmer_freq)
     chords = [
-        (55.00,  [110.00, 164.81, 246.94, 261.63], [220.00, 329.63, 261.63, 246.94]), # Am9
-        (43.65,  [87.31,  130.81, 164.81, 220.00], [174.61, 261.63, 329.63, 220.00]), # Fmaj7
-        (36.71,  [73.42,  110.00, 164.81, 174.61], [293.66, 220.00, 349.23, 329.63]), # Dm9
-        (41.20,  [82.41,  123.47, 164.81, 196.00], [246.94, 329.63, 392.00, 293.66]), # Em7
+        # Bar 1: Dmadd9 (deep, contemplative, magnetic)
+        (73.42, [146.83, 174.61, 220.00, 329.63],
+         [220.00, 293.66, 329.63, 349.23, 440.00, 349.23, 329.63, 293.66], 587.33),
+        # Bar 2: Bbmaj7#11 (cinematic wonder & revelation)
+        (58.27, [116.54, 174.61, 220.00, 293.66],
+         [220.00, 293.66, 329.63, 349.23, 440.00, 329.63, 293.66, 220.00], 587.33),
+        # Bar 3: Gm9 (emotional weight of passing life)
+        (49.00, [98.00,  146.83, 220.00, 233.08],
+         [196.00, 233.08, 293.66, 349.23, 440.00, 349.23, 293.66, 233.08], 523.25),
+        # Bar 4: Asus4 -> A7b9 (irresistible harmonic tension resolving back to Dmadd9!)
+        (55.00, [110.00, 164.81, 220.00, 277.18],
+         [220.00, 293.66, 329.63, 392.00, 349.23, 329.63, 277.18, 220.00], 554.37),
     ]
+
     pad_L = np.zeros(N, dtype=np.float32)
     pad_R = np.zeros(N, dtype=np.float32)
-    piano_dry = np.zeros(N, dtype=np.float32)
+    piano_L = np.zeros(N, dtype=np.float32)
+    piano_R = np.zeros(N, dtype=np.float32)
+    shimmer_L = np.zeros(N, dtype=np.float32)
+    shimmer_R = np.zeros(N, dtype=np.float32)
     pulse_sub = np.zeros(N, dtype=np.float32)
+    clock_L = np.zeros(N, dtype=np.float32)
+    clock_R = np.zeros(N, dtype=np.float32)
 
     chord_len = 4.0
     n_blocks = int(np.ceil(dur / chord_len)) + 1
-    xfade_s = 0.65
+    xfade_s = 0.70
+
+    # Dynamic 4-Act Story Arrangement Envelope
+    cello_arr = np.clip((t - 2.5) / 8.0, 0.38, 1.0).astype(np.float32)
+    shimmer_arr = (
+        np.clip((t - dur * 0.36) / 7.5, 0.0, 1.0) * 0.75
+        + np.clip((t - (dur - 5.2)) / 1.8, 0.0, 1.0) * 0.45
+    ).astype(np.float32)
 
     for bi in range(n_blocks):
         t_start = bi * chord_len - xfade_s
@@ -386,65 +421,113 @@ def build_master_stereo_mix(tightened_wav: str, out_master_wav: str, sfx_events:
         w_out = np.clip((((bi + 1) * chord_len + xfade_s) - bt) / (2 * xfade_s), 0.0, 1.0)
         win = (0.5 - 0.5 * np.cos(np.pi * w_in)) * (0.5 - 0.5 * np.cos(np.pi * w_out))
 
-        f_bass, pad_freqs, arp_notes = chords[bi % 4]
+        f_bass, pad_freqs, arp_notes, f_shim = chords[bi % 4]
 
-        # 1. Warm analog cello-pad ensemble (fundamental + octave + soft 3rd harmonic, stereo detuned)
-        cL = 0.34 * np.sin(2 * np.pi * f_bass * bt)
-        cR = 0.34 * np.sin(2 * np.pi * f_bass * bt + 0.15)
+        # 1. Warm Analog Cello + Mobile-Audible Upper Bass Harmonics (f + 2f + 3f + sub f/2)
+        cL = (0.24 * np.sin(2 * np.pi * (0.5 * f_bass) * bt)
+              + 0.36 * np.sin(2 * np.pi * f_bass * bt)
+              + 0.19 * np.sin(2 * np.pi * (2.0 * f_bass) * bt + 0.2)
+              + 0.08 * np.sin(2 * np.pi * (3.0 * f_bass) * bt))
+        cR = (0.24 * np.sin(2 * np.pi * (0.5 * f_bass) * bt)
+              + 0.36 * np.sin(2 * np.pi * f_bass * bt + 0.14)
+              + 0.19 * np.sin(2 * np.pi * (2.0 * f_bass) * bt + 0.5)
+              + 0.08 * np.sin(2 * np.pi * (3.0 * f_bass) * bt + 0.3))
+
         for vi, pf in enumerate(pad_freqs):
-            sw = 0.82 + 0.18 * np.sin(2 * np.pi * (0.14 + 0.03 * vi) * bt + vi)
-            fL, fR = pf * 0.9984, pf * 1.0016
-            cL += sw * (0.20 * np.sin(2*np.pi*fL*bt + vi) + 0.08 * np.sin(4*np.pi*fL*bt) + 0.03 * np.sin(6*np.pi*fL*bt))
-            cR += sw * (0.20 * np.sin(2*np.pi*fR*bt + vi + 0.6) + 0.08 * np.sin(4*np.pi*fR*bt + 0.4) + 0.03 * np.sin(6*np.pi*fR*bt))
+            sw = 0.80 + 0.20 * np.sin(2 * np.pi * (0.16 + 0.04 * vi) * bt + vi)
+            fL, fR = pf * 0.9980, pf * 1.0020
+            cL += sw * (0.18 * np.sin(2*np.pi*fL*bt + vi) + 0.075 * np.sin(4*np.pi*fL*bt) + 0.028 * np.sin(6*np.pi*fL*bt))
+            cR += sw * (0.18 * np.sin(2*np.pi*fR*bt + vi + 0.7) + 0.075 * np.sin(4*np.pi*fR*bt + 0.4) + 0.028 * np.sin(6*np.pi*fR*bt))
         pad_L[i0:i1] += (cL * win).astype(np.float32)
         pad_R[i0:i1] += (cR * win).astype(np.float32)
 
-        # 2. Delicate felt-piano / glass motif (sparse half-note droplets every 2.0s)
-        for step_k in range(2):
-            nt_t0 = bi * chord_len + step_k * 2.0 + 0.12
-            ni0 = int(nt_t0 * SR)
-            ndur = int(2.3 * SR)
+        # 2. Ethereal Wide-Stereo Bowed-Glass Shimmer (Act III climax & outro)
+        vib_L = 1.0 + 0.0025 * np.sin(2 * np.pi * 4.6 * bt)
+        vib_R = 1.0 + 0.0025 * np.sin(2 * np.pi * 4.9 * bt + 1.3)
+        sL = 0.16 * np.sin(2 * np.pi * f_shim * vib_L * bt) + 0.07 * np.sin(2 * np.pi * (f_shim * 1.5) * bt + 0.8)
+        sR = 0.16 * np.sin(2 * np.pi * f_shim * vib_R * bt + 1.1) + 0.07 * np.sin(2 * np.pi * (f_shim * 1.5) * bt + 2.1)
+        shimmer_L[i0:i1] += (sL * win).astype(np.float32)
+        shimmer_R[i0:i1] += (sR * win).astype(np.float32)
+
+        # 3. Hypnotic 8-Step Felt-Piano Arpeggio (0.50s 8th-note ostinato at 120 BPM) + Swiss Watch Tick-Tock
+        for step_k in range(8):
+            beat_t0 = bi * chord_len + step_k * 0.50
+            ni0 = int(beat_t0 * SR)
             if 0 <= ni0 < N - 400:
+                vel = (0.34 if step_k in (0, 4) else (0.25 if step_k in (2, 6) else 0.19))
+                ndur = int(1.35 * SR)
                 ni1 = min(N, ni0 + ndur)
                 nt = np.arange(ni1 - ni0, dtype=np.float32) / SR
-                nf = arp_notes[(bi + step_k * 2) % len(arp_notes)]
-                att = np.clip(nt / 0.022, 0.0, 1.0)
+                nf = arp_notes[step_k]
+                att = np.clip(nt / 0.015, 0.0, 1.0)
+                hammer = 0.14 * np.sin(2 * np.pi * 135.0 * nt) * np.exp(-nt * 65.0)
                 tone = att * (
-                    np.sin(2 * np.pi * nf * nt) * np.exp(-nt * 2.1)
-                    + 0.30 * np.sin(2 * np.pi * (nf * 2.0) * nt) * np.exp(-nt * 3.8)
-                    + 0.08 * np.sin(2 * np.pi * (nf * 3.0) * nt) * np.exp(-nt * 6.5)
-                )
-                piano_dry[ni0:ni1] += (tone * 0.30).astype(np.float32)
+                    np.sin(2 * np.pi * nf * nt) * np.exp(-nt * 2.35)
+                    + 0.34 * np.sin(2 * np.pi * (nf * 2.001) * nt) * np.exp(-nt * 4.4)
+                    + 0.11 * np.sin(2 * np.pi * (nf * 3.003) * nt) * np.exp(-nt * 7.8)
+                    + 0.04 * np.sin(2 * np.pi * (nf * 4.006) * nt) * np.exp(-nt * 12.0)
+                    + hammer
+                ) * vel
+                pan_p = 0.32 if (step_k % 2 == 0) else 0.68
+                piano_L[ni0:ni1] += (tone * (1.0 - 0.55 * pan_p)).astype(np.float32)
+                piano_R[ni0:ni1] += (tone * (0.45 + 0.55 * pan_p)).astype(np.float32)
 
-            # 3. Subtle deep heartbeat sub-pulse every 2.0s (quiet forward momentum)
-            pi0 = int((bi * chord_len + step_k * 2.0) * SR)
-            pdur = int(0.42 * SR)
-            if 0 <= pi0 < N - 400:
-                pi1 = min(N, pi0 + pdur)
-                pt = np.arange(pi1 - pi0, dtype=np.float32) / SR
-                p_env = np.clip(pt / 0.018, 0.0, 1.0) * np.exp(-pt * 8.5)
-                pulse_sub[pi0:pi1] += (np.sin(2 * np.pi * (58.0 - 22.0 * pt) * pt) * p_env * 0.36).astype(np.float32)
+                # Swiss Horology Watch Escapement (subtle hypnotic Tick on even 0.5s, Tock on odd 0.5s)
+                tdur = min(int(0.045 * SR), N - ni0)
+                tt_k = np.arange(tdur, dtype=np.float32) / SR
+                if step_k % 2 == 0:
+                    tk_sig = (np.sin(2 * np.pi * 1720.0 * tt_k) * np.exp(-tt_k * 175.0)
+                              + 0.45 * np.sin(2 * np.pi * 540.0 * tt_k) * np.exp(-tt_k * 115.0)) * 0.055
+                    clock_L[ni0:ni0+tdur] += tk_sig * 1.15
+                    clock_R[ni0:ni0+tdur] += tk_sig * 0.65
+                else:
+                    tk_sig = (np.sin(2 * np.pi * 1340.0 * tt_k) * np.exp(-tt_k * 165.0)
+                              + 0.50 * np.sin(2 * np.pi * 430.0 * tt_k) * np.exp(-tt_k * 110.0)) * 0.046
+                    clock_L[ni0:ni0+tdur] += tk_sig * 0.65
+                    clock_R[ni0:ni0+tdur] += tk_sig * 1.15
 
-    # Filter warm cello-string pad below 780 Hz (audible on mobile speakers, zero clash with 2-5kHz speech clarity!)
-    b_pad, a_pad = butter(3, 780.0 / (SR / 2), btype="low")
-    pad_L = lfilter(b_pad, a_pad, pad_L)
-    pad_R = lfilter(b_pad, a_pad, pad_R)
+        # 4. Visceral Lub-Dub Heartbeat Sub-Pulse every 2.0s (half-bar downbeats)
+        for hb_k in range(2):
+            for sub_off, f_start, h_gain in ((0.00, 62.0, 0.38), (0.24, 52.0, 0.24)):
+                pi0 = int((bi * chord_len + hb_k * 2.0 + sub_off) * SR)
+                pdur = int(0.36 * SR)
+                if 0 <= pi0 < N - 400:
+                    pi1 = min(N, pi0 + pdur)
+                    pt = np.arange(pi1 - pi0, dtype=np.float32) / SR
+                    p_env = np.clip(pt / 0.016, 0.0, 1.0) * np.exp(-pt * 9.5)
+                    hb_wave = (np.sin(2 * np.pi * (f_start - 20.0 * pt) * pt)
+                               + 0.35 * np.sin(2 * np.pi * 2.0 * (f_start - 20.0 * pt) * pt))
+                    pulse_sub[pi0:pi1] += (hb_wave * p_env * h_gain).astype(np.float32)
 
-    # Filter felt piano below 1550 Hz + stereo multi-tap hall reverb
-    b_pno, a_pno = butter(2, 1550.0 / (SR / 2), btype="low")
-    piano_flt = lfilter(b_pno, a_pno, piano_dry)
-    rev_L = piano_flt.copy()
-    rev_R = piano_flt.copy()
-    for d_ms, g_l, g_r in [(41, 0.48, 0.26), (79, 0.26, 0.46), (137, 0.32, 0.20), (211, 0.18, 0.30)]:
+    # Warm analog low-pass on cello ensemble (< 720 Hz -> zero masking of Persian consonants!)
+    b_pad, a_pad = butter(3, 720.0 / (SR / 2), btype="low")
+    pad_L = lfilter(b_pad, a_pad, pad_L) * cello_arr
+    pad_R = lfilter(b_pad, a_pad, pad_R) * cello_arr
+
+    # Velvet low-pass on felt piano (< 1650 Hz) + lush 6-tap cross-stereo concert hall reverb
+    b_pno, a_pno = butter(2, 1650.0 / (SR / 2), btype="low")
+    pL_flt = lfilter(b_pno, a_pno, piano_L)
+    pR_flt = lfilter(b_pno, a_pno, piano_R)
+    rev_L = pL_flt.copy()
+    rev_R = pR_flt.copy()
+    for d_ms, g_same, g_cross in [
+        (37, 0.42, 0.24), (73, 0.22, 0.40), (119, 0.30, 0.18),
+        (181, 0.16, 0.28), (269, 0.20, 0.12), (389, 0.11, 0.17)
+    ]:
         ds = int(d_ms * 0.001 * SR)
         if ds < N:
-            rev_L[ds:] += piano_flt[:-ds] * g_l
-            rev_R[ds:] += piano_flt[:-ds] * g_r
+            rev_L[ds:] += pL_flt[:-ds] * g_same + pR_flt[:-ds] * g_cross
+            rev_R[ds:] += pR_flt[:-ds] * g_same + pL_flt[:-ds] * g_cross
 
-    fade = (np.clip(t / 0.7, 0.0, 1.0) * np.clip((dur - t) / 1.6, 0.0, 1.0)).astype(np.float32)
-    score_gain = 0.255
-    pad_L = (pad_L + rev_L * 0.68 + pulse_sub * 0.48) * score_gain * duck * fade
-    pad_R = (pad_R + rev_R * 0.68 + pulse_sub * 0.48) * score_gain * duck * fade
+    # Soft band-pass on Act III shimmer (420 - 1320 Hz warm angelic halo)
+    b_shm, a_shm = butter(2, [420.0 / (SR / 2), 1320.0 / (SR / 2)], btype="band")
+    shimmer_L = lfilter(b_shm, a_shm, shimmer_L) * shimmer_arr
+    shimmer_R = lfilter(b_shm, a_shm, shimmer_R) * shimmer_arr
+
+    fade = (np.clip(t / 0.45, 0.0, 1.0) * np.clip((dur - t) / 1.5, 0.0, 1.0)).astype(np.float32)
+    score_gain = 0.295
+    mus_L = (pad_L * 0.95 + rev_L * 0.72 + shimmer_L * 0.85 + pulse_sub * 0.52 + clock_L * 0.75) * score_gain * duck * fade
+    mus_R = (pad_R * 0.95 + rev_R * 0.72 + shimmer_R * 0.85 + pulse_sub * 0.52 + clock_R * 0.75) * score_gain * duck * fade
 
     sfx_L = np.zeros(N, dtype=np.float32)
     sfx_R = np.zeros(N, dtype=np.float32)
@@ -458,64 +541,93 @@ def build_master_stereo_mix(tightened_wav: str, out_master_wav: str, sfx_events:
             continue
 
         if kind == "ping":
-            dn = min(int(0.18 * SR), N - idx)
+            dn = min(int(0.20 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
-            f0 = float(ev.get("freq", 1046.5))
+            f0 = float(ev.get("freq", 1174.66))
             pan = float(ev.get("pan", 0.5))
-            sig = np.sin(2 * np.pi * f0 * tt) * np.exp(-tt * 26.0) * 0.034
+            sig = (np.sin(2 * np.pi * f0 * tt) * np.exp(-tt * 24.0)
+                   + 0.35 * np.sin(2 * np.pi * (f0 * 0.5) * tt) * np.exp(-tt * 16.0)) * 0.036
             sfx_L[idx:idx+dn] += sig * (1.0 - 0.5 * pan)
             sfx_R[idx:idx+dn] += sig * (0.5 + 0.5 * pan)
 
         elif kind == "whoosh":
-            # Soft filtered air whoosh on camera zoom transitions!
-            dn = min(int(0.52 * SR), N - idx)
+            dn = min(int(0.48 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
             noise = rng_s.standard_normal(dn).astype(np.float32)
-            shaped = lfilter(*butter(2, [180.0/(SR/2), 950.0/(SR/2)], btype="band"), noise)
+            shaped = lfilter(*butter(2, [190.0/(SR/2), 1050.0/(SR/2)], btype="band"), noise)
             env_w = np.sin(np.pi * tt / (dn / SR)) ** 1.8
-            sig = shaped * env_w * 0.032
-            sfx_L[idx:idx+dn] += sig * 0.9
-            sfx_R[idx:idx+dn] += sig * 1.1
+            sig = shaped * env_w * 0.036
+            sfx_L[idx:idx+dn] += sig * 0.88
+            sfx_R[idx:idx+dn] += sig * 1.12
 
-        elif kind == "click":
-            dn = min(int(0.06 * SR), N - idx)
+        elif kind == "click" or kind == "tick":
+            dn = min(int(0.055 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
-            sig = (np.sin(2 * np.pi * 1850.0 * tt) * np.exp(-tt * 145.0)
-                   + 0.55 * np.sin(2 * np.pi * 620.0 * tt) * np.exp(-tt * 95.0)) * 0.046
+            sig = (np.sin(2 * np.pi * 1920.0 * tt) * np.exp(-tt * 155.0)
+                   + 0.55 * np.sin(2 * np.pi * 640.0 * tt) * np.exp(-tt * 95.0)) * 0.048
             sfx_L[idx:idx+dn] += sig
             sfx_R[idx:idx+dn] += sig
 
-        elif kind == "stamp":
-            dn = min(int(0.14 * SR), N - idx)
+        elif kind == "heartbeat":
+            dn = min(int(0.48 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
-            sig = (np.sin(2 * np.pi * 135.0 * tt) * np.exp(-tt * 38.0)
-                   + 0.4 * np.sin(2 * np.pi * 1650.0 * tt) * np.exp(-tt * 140.0)) * 0.052
+            lub = np.sin(2 * np.pi * (68.0 - 26.0 * tt) * tt) * np.exp(-tt * 13.0)
+            dub_t = np.maximum(0.0, tt - 0.19)
+            dub = (tt >= 0.19).astype(np.float32) * np.sin(2 * np.pi * (56.0 - 20.0 * dub_t) * dub_t) * np.exp(-dub_t * 15.0) * 0.72
+            sig = (lub + dub) * 0.068
+            sfx_L[idx:idx+dn] += sig
+            sfx_R[idx:idx+dn] += sig
+
+        elif kind == "scan":
+            dn = min(int(0.38 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            env_sc = np.sin(np.pi * tt / (dn / SR)) ** 1.4
+            sweep = np.sin(2 * np.pi * (340.0 + 480.0 * tt) * tt) * env_sc * 0.026
+            sfx_L[idx:idx+dn] += sweep * 0.80
+            sfx_R[idx:idx+dn] += sweep * 1.20
+
+        elif kind == "shatter":
+            dn = min(int(0.34 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            noise = rng_s.standard_normal(dn).astype(np.float32)
+            glass = lfilter(*butter(2, [1400.0/(SR/2), 4600.0/(SR/2)], btype="band"), noise) * np.exp(-tt * 18.0)
+            impact = np.sin(2 * np.pi * 125.0 * tt) * np.exp(-tt * 28.0)
+            sig = (0.55 * glass + 0.65 * impact) * 0.052
+            sfx_L[idx:idx+dn] += sig * 1.05
+            sfx_R[idx:idx+dn] += sig * 0.95
+
+        elif kind == "stamp":
+            dn = min(int(0.16 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            sig = (np.sin(2 * np.pi * 128.0 * tt) * np.exp(-tt * 34.0)
+                   + 0.42 * np.sin(2 * np.pi * 1680.0 * tt) * np.exp(-tt * 135.0)) * 0.056
             sfx_L[idx:idx+dn] += sig
             sfx_R[idx:idx+dn] += sig
 
         elif kind == "sub_swell":
-            dn = min(int(1.1 * SR), N - idx)
+            dn = min(int(1.15 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
             env_s = np.sin(np.pi * tt / (dn / SR)) ** 1.5
-            sig = np.sin(2 * np.pi * (55.0 - 11.0 * tt) * tt) * env_s * 0.068
+            sig = (np.sin(2 * np.pi * (58.0 - 12.0 * tt) * tt)
+                   + 0.30 * np.sin(2 * np.pi * 2.0 * (58.0 - 12.0 * tt) * tt)) * env_s * 0.068
             sfx_L[idx:idx+dn] += sig
             sfx_R[idx:idx+dn] += sig
 
         elif kind == "chime":
-            dn = min(int(2.5 * SR), N - idx)
+            dn = min(int(2.6 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
-            f0 = float(ev.get("freq", 523.25))
+            f0 = float(ev.get("freq", 587.33))
             att = np.clip(tt / 0.012, 0, 1)
             sig = att * (
-                np.sin(2 * np.pi * f0 * tt) * np.exp(-tt * 2.5)
-                + 0.42 * np.sin(2 * np.pi * f0 * 1.5 * tt) * np.exp(-tt * 3.4)
-                + 0.22 * np.sin(2 * np.pi * f0 * 2.0 * tt) * np.exp(-tt * 4.6)
-            ) * 0.055
-            sfx_L[idx:idx+dn] += sig * 0.95
-            sfx_R[idx:idx+dn] += sig * 1.05
+                np.sin(2 * np.pi * f0 * tt) * np.exp(-tt * 2.3)
+                + 0.44 * np.sin(2 * np.pi * f0 * 1.5 * tt) * np.exp(-tt * 3.2)
+                + 0.24 * np.sin(2 * np.pi * f0 * 2.0 * tt) * np.exp(-tt * 4.4)
+            ) * 0.058
+            sfx_L[idx:idx+dn] += sig * 0.94
+            sfx_R[idx:idx+dn] += sig * 1.06
 
-    mix_L = np.clip(vo + pad_L + sfx_L, -0.97, 0.97)
-    mix_R = np.clip(vo + pad_R + sfx_R, -0.97, 0.97)
+    mix_L = np.clip(vo + mus_L + sfx_L, -0.97, 0.97)
+    mix_R = np.clip(vo + mus_R + sfx_R, -0.97, 0.97)
 
     stereo = np.empty((N * 2,), dtype=np.int16)
     stereo[0::2] = (mix_L * 32767).astype(np.int16)
@@ -526,7 +638,7 @@ def build_master_stereo_mix(tightened_wav: str, out_master_wav: str, sfx_events:
         wf.setsampwidth(2)
         wf.setframerate(SR)
         wf.writeframes(stereo.tobytes())
-    print(f"[Audio] Master 48kHz stereo mix saved -> {out_master_wav} ({dur:.2f}s)", flush=True)
+    print(f"[Audio] Studio v3.0 Hypnotic Master 48kHz stereo mix saved -> {out_master_wav} ({dur:.2f}s)", flush=True)
 
 
 def build_episode_audio(
@@ -562,8 +674,8 @@ def build_episode_audio(
         t_cues[cue_name] = round(ts, 3)
         sfx_events.append({"type": sfx_kind, "t": max(0.0, ts - 0.03)})
 
-    # Signature crystalline chime on endplate reveal
-    sfx_events.append({"type": "chime", "t": max(0.5, total_dur - tail_pad_sec + 0.12), "freq": 523.25})
+    # Signature crystalline D5 tonic chime on endplate reveal
+    sfx_events.append({"type": "chime", "t": max(0.5, total_dur - tail_pad_sec + 0.12), "freq": 587.33})
     sfx_events.append({"type": "sub_swell", "t": max(0.3, total_dur - tail_pad_sec - 0.25)})
 
     build_master_stereo_mix(tight_wav, master_wav, sfx_events)

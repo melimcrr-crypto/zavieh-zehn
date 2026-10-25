@@ -661,6 +661,259 @@ def draw_cursor_pointer(cs, cg, x: float, y: float, click_p: float = 0.0, alpha:
                 cg.arc(x, y, rr, 0, 2 * math.pi); cg.set_source_rgba(1, 1, 1, ra * 0.55); cg.set_line_width(4.0); cg.stroke()
 
 
+# =============================================================================
+# STUDIO v3.0 HYPNOTIC CINEMA CAMERA, EDITING SHOCKWAVES & HOROLOGY PRIMITIVES
+# =============================================================================
+
+def impact_punch(t: float, cue_t: float, amp: float = 0.032, dur: float = 0.55) -> float:
+    """Damped editing beat-punch zoom delta triggered on reveal timestamps."""
+    if t < cue_t or t > cue_t + dur:
+        return 0.0
+    u = (t - cue_t) / max(0.05, dur)
+    return amp * math.sin(math.pi * min(1.0, u * 1.35)) * math.exp(-3.1 * u)
+
+
+def push_camera(cs, cg, zoom: float = 1.0, dx: float = 0.0, dy: float = 0.0, px: float = 540.0, py: float = 860.0):
+    """Pushes a synchronized 60fps virtual cinema camera onto sharp + bloom Cairo contexts."""
+    for ctx in (cs, cg):
+        ctx.save()
+        ctx.translate(px + dx, py + dy)
+        ctx.scale(zoom, zoom)
+        ctx.translate(-px, -py)
+
+
+def pop_camera_and_transform_texts(
+    cs, cg, scene_txts: list, out_txts: list,
+    zoom: float = 1.0, dx: float = 0.0, dy: float = 0.0, px: float = 540.0, py: float = 860.0
+):
+    """Restores Cairo camera state and locks scene text overlays to the exact camera motion."""
+    cs.restore()
+    cg.restore()
+    for sp, tx, ty, al in scene_txts:
+        nx = px + (tx - px) * zoom + dx
+        ny = py + (ty - py) * zoom + dy
+        out_txts.append((sp, nx, ny, al))
+
+
+def draw_shockwave_ring(cs, cg, cx: float, cy: float, progress: float, max_r: float = 380.0, alpha: float = 1.0):
+    """Kinetic editing impact ring + 12 radial light streaks on dramatic reveals."""
+    p = clamp(progress)
+    if p <= 0.01 or p >= 0.99 or alpha <= 0.01:
+        return
+    ep = ease_out_cubic(p)
+    fade = (1.0 - p) ** 1.45 * alpha
+    r1 = 28.0 + ep * max_r
+    r2 = 16.0 + ep * (max_r * 0.68)
+    cs.save(); cg.save()
+    cs.set_dash([]); cg.set_dash([])
+    cs.arc(cx, cy, r1, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.72 * fade); cs.set_line_width(2.0); cs.stroke()
+    cg.arc(cx, cy, r1, 0, 2 * math.pi); cg.set_source_rgba(1, 1, 1, 0.50 * fade); cg.set_line_width(5.0); cg.stroke()
+    cs.arc(cx, cy, r2, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.35 * fade); cs.set_line_width(1.2); cs.stroke()
+    for k in range(12):
+        ang = k * (math.pi / 6.0)
+        ri = r2 + 12.0
+        ro = r1 + 18.0
+        cs.move_to(cx + math.cos(ang) * ri, cy + math.sin(ang) * ri)
+        cs.line_to(cx + math.cos(ang) * ro, cy + math.sin(ang) * ro)
+        cs.set_source_rgba(1, 1, 1, 0.44 * fade); cs.set_line_width(1.4); cs.stroke()
+    cs.restore(); cg.restore()
+
+
+def draw_hypnotic_chronograph_ring(
+    cs, cg, cx: float, cy: float, radius: float, t: float,
+    alpha: float = 1.0, draw_p: float = 1.0, speed: float = 1.0
+):
+    """
+    Perpetual counter-rotating Swiss chronograph / astronomical dial:
+    60 outer second ticks + 12 luminous hour batons + counter-rotating inner orbital + sweeping needle.
+    """
+    if alpha <= 0.01 or draw_p <= 0.01:
+        return
+    dp = clamp(draw_p)
+    cs.save(); cg.save()
+    cs.set_dash([]); cg.set_dash([])
+
+    # Outer soft halo circle
+    cs.arc(cx, cy, radius, -math.pi / 2, -math.pi / 2 + 2 * math.pi * dp)
+    cs.set_source_rgba(1, 1, 1, 0.24 * alpha); cs.set_line_width(1.3); cs.stroke()
+
+    # 60 rotating horology ticks
+    n_ticks = int(60 * dp)
+    rot_outer = t * 0.22 * speed
+    for k in range(n_ticks):
+        ang = k * (2 * math.pi / 60.0) + rot_outer
+        is_maj = (k % 5 == 0)
+        r_in = radius - (16.0 if is_maj else 8.0)
+        r_out = radius - 2.0
+        x0, y0 = cx + math.cos(ang) * r_in, cy + math.sin(ang) * r_in
+        x1, y1 = cx + math.cos(ang) * r_out, cy + math.sin(ang) * r_out
+        cs.move_to(x0, y0); cs.line_to(x1, y1)
+        cs.set_source_rgba(1, 1, 1, (0.72 if is_maj else 0.28) * alpha)
+        cs.set_line_width(2.2 if is_maj else 1.1)
+        cs.stroke()
+        if is_maj:
+            cg.move_to(x0, y0); cg.line_to(x1, y1)
+            cg.set_source_rgba(1, 1, 1, 0.35 * alpha); cg.set_line_width(4.0); cg.stroke()
+
+    # Counter-rotating inner segmented orbital ring
+    r_orb = radius * 0.78
+    rot_in = -t * 0.36 * speed
+    for seg_i in range(4):
+        a0 = rot_in + seg_i * (math.pi / 2.0) + 0.14
+        a1 = a0 + (math.pi / 2.0 - 0.28) * dp
+        if a1 > a0:
+            cs.arc(cx, cy, r_orb, a0, a1)
+            cs.set_source_rgba(1, 1, 1, 0.22 * alpha); cs.set_line_width(1.3); cs.stroke()
+
+    # Sweeping precision chronograph needle (1 rev per 8s * speed)
+    if dp > 0.5:
+        na = -math.pi / 2.0 + t * (2 * math.pi / 8.0) * speed
+        nx = cx + math.cos(na) * (radius - 20.0)
+        ny = cy + math.sin(na) * (radius - 20.0)
+        cs.move_to(cx - math.cos(na) * 18.0, cy - math.sin(na) * 18.0)
+        cs.line_to(nx, ny)
+        cs.set_source_rgba(1, 1, 1, 0.45 * alpha); cs.set_line_width(1.5); cs.stroke()
+        cs.arc(nx, ny, 3.5, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.88 * alpha); cs.fill()
+        cg.arc(nx, ny, 7.5, 0, 2 * math.pi); cg.set_source_rgba(1, 1, 1, 0.55 * alpha); cg.fill()
+
+    cs.restore(); cg.restore()
+
+
+def draw_hourglass_monolith(
+    cs, cg, cx: float, cy: float, w: float, h: float,
+    sand_top: float = 0.65, flowing: bool = True, t: float = 0.0,
+    alpha: float = 1.0, draw_p: float = 1.0
+):
+    """Architectural OLED Hourglass with live draining upper dune, falling luminous stream & rising lower cone."""
+    if alpha <= 0.01 or draw_p <= 0.01:
+        return
+    dp = clamp(draw_p)
+    hw, hh = w * 0.5, h * 0.5
+    top_y, bot_y = cy - hh, cy + hh
+    neck_w = max(7.0, w * 0.07)
+
+    for ctx, lw, al in ((cs, 2.5, alpha * 0.95), (cg, 5.2, alpha * 0.42)):
+        ctx.save()
+        set_stroke_draw(ctx, dp, 900.0)
+        ctx.set_source_rgba(1, 1, 1, al)
+        ctx.set_line_width(lw)
+        # Top & Bottom brushed caps
+        rounded_rect_path(ctx, cx - hw - 10, top_y - 12, w + 20, 12, 4); ctx.stroke()
+        rounded_rect_path(ctx, cx - hw - 10, bot_y, w + 20, 12, 4); ctx.stroke()
+        # Twin outer architectural pillars
+        ctx.move_to(cx - hw - 4, top_y); ctx.line_to(cx - hw - 4, bot_y); ctx.stroke()
+        ctx.move_to(cx + hw + 4, top_y); ctx.line_to(cx + hw + 4, bot_y); ctx.stroke()
+        # Left & Right curved glass bulbs
+        ctx.move_to(cx - hw + 8, top_y)
+        ctx.curve_to(cx - hw + 8, cy - hh * 0.25, cx - neck_w, cy - hh * 0.14, cx - neck_w, cy)
+        ctx.curve_to(cx - neck_w, cy + hh * 0.14, cx - hw + 8, cy + hh * 0.25, cx - hw + 8, bot_y)
+        ctx.stroke()
+        ctx.move_to(cx + hw - 8, top_y)
+        ctx.curve_to(cx + hw - 8, cy - hh * 0.25, cx + neck_w, cy - hh * 0.14, cx + neck_w, cy)
+        ctx.curve_to(cx + neck_w, cy + hh * 0.14, cx + hw - 8, cy + hh * 0.25, cx + hw - 8, bot_y)
+        ctx.stroke()
+        ctx.restore()
+
+    if dp > 0.45:
+        sf = clamp(sand_top)
+        bf = clamp(1.0 - sf)
+        cs.save(); cg.save()
+        cs.set_dash([]); cg.set_dash([])
+        # Upper sand pool (funneling into neck)
+        if sf > 0.03:
+            sh = (hh - 14.0) * (0.22 + 0.72 * sf)
+            sw = (hw - 14.0) * (0.32 + 0.65 * sf)
+            dip = 9.0 * (1.0 if flowing else 0.0)
+            cs.move_to(cx - sw, cy - sh)
+            cs.curve_to(cx - sw * 0.35, cy - sh + dip, cx + sw * 0.35, cy - sh + dip, cx + sw, cy - sh)
+            cs.curve_to(cx + sw * 0.75, cy - sh * 0.35, cx + neck_w * 0.8, cy - 8, cx, cy - 2)
+            cs.curve_to(cx - neck_w * 0.8, cy - 8, cx - sw * 0.75, cy - sh * 0.35, cx - sw, cy - sh)
+            cs.close_path()
+            cs.set_source_rgba(1, 1, 1, 0.26 * alpha); cs.fill_preserve()
+            cs.set_source_rgba(1, 1, 1, 0.78 * alpha); cs.set_line_width(1.6); cs.stroke()
+
+        # Lower sand mound (rising smoothly)
+        if bf > 0.03:
+            mh = (hh - 14.0) * (0.14 + 0.72 * bf)
+            mw = hw - 14.0
+            cs.move_to(cx - mw, bot_y - 3)
+            cs.curve_to(cx - mw * 0.38, bot_y - 3 - mh * 1.35, cx + mw * 0.38, bot_y - 3 - mh * 1.35, cx + mw, bot_y - 3)
+            cs.close_path()
+            cs.set_source_rgba(1, 1, 1, 0.30 * alpha); cs.fill_preserve()
+            cs.set_source_rgba(1, 1, 1, 0.82 * alpha); cs.set_line_width(1.6); cs.stroke()
+            cg.arc(cx, bot_y - 3 - mh * 0.72, 10.0, 0, 2 * math.pi)
+            cg.set_source_rgba(1, 1, 1, 0.35 * alpha); cg.fill()
+
+        # Falling luminous sand grains through neck!
+        if flowing:
+            mound_tip_y = bot_y - 4 - (hh - 14.0) * (0.14 + 0.72 * bf) * 0.72
+            cs.move_to(cx, cy); cs.line_to(cx, mound_tip_y)
+            cs.set_source_rgba(1, 1, 1, 0.65 * alpha); cs.set_line_width(1.8); cs.stroke()
+            cg.move_to(cx, cy); cg.line_to(cx, mound_tip_y)
+            cg.set_source_rgba(1, 1, 1, 0.45 * alpha); cg.set_line_width(4.2); cg.stroke()
+            for gi in range(9):
+                gu = ((t * 2.6 + gi / 9.0) % 1.0)
+                gy = cy + (mound_tip_y - cy) * gu
+                gx = cx + math.sin(gi * 2.3 + t * 9.0) * 1.8
+                cs.arc(gx, gy, 2.1, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.95 * alpha); cs.fill()
+            # Micro-sparks bouncing off sand peak
+            for si in range(4):
+                su = ((t * 3.4 + si * 0.25) % 1.0)
+                ang_s = -math.pi * (0.22 + 0.56 * ((si * 37) % 10) / 10.0)
+                sx = cx + math.cos(ang_s) * su * 22.0 * (1 if si % 2 == 0 else -1)
+                sy = mound_tip_y + math.sin(ang_s) * su * 16.0 + (su ** 2) * 18.0
+                cs.arc(sx, sy, 1.6, 0, 2 * math.pi)
+                cs.set_source_rgba(1, 1, 1, (1.0 - su) * 0.85 * alpha); cs.fill()
+        cs.restore(); cg.restore()
+
+
+def draw_ecg_waveform(cs, cg, x0: float, x1: float, y_mid: float, t: float, amp: float = 34.0, alpha: float = 1.0):
+    """Live scrolling P-Q-R-S-T human heartbeat phosphor lifeline."""
+    if alpha <= 0.01 or x1 <= x0 + 20:
+        return
+    span = x1 - x0
+    head_u = (t * 0.48) % 1.0
+    head_x = x0 + head_u * span
+
+    def _pqrst(phase_01: float) -> float:
+        # Sharp realistic P-Q-R-S-T pulse centered at phase 0.50
+        d = phase_01 - 0.50
+        p_wv = 0.18 * math.exp(-((d + 0.14) / 0.032) ** 2)
+        q_wv = -0.22 * math.exp(-((d + 0.045) / 0.015) ** 2)
+        r_wv = 1.00 * math.exp(-(d / 0.018) ** 2)
+        s_wv = -0.34 * math.exp(-((d - 0.042) / 0.016) ** 2)
+        t_wv = 0.26 * math.exp(-((d - 0.16) / 0.042) ** 2)
+        return -(p_wv + q_wv + r_wv + s_wv + t_wv)
+
+    cs.save(); cg.save()
+    cs.set_dash([]); cg.set_dash([])
+    N_pts = 150
+    prev = None
+    for i in range(N_pts + 1):
+        u = i / N_pts
+        px = x0 + u * span
+        # 2.5 beats visible across width
+        beat_ph = (u * 2.5) % 1.0
+        py = y_mid + _pqrst(beat_ph) * amp
+        # Phosphor trail brightness behind sweeping head_u
+        age = (head_u - u) % 1.0
+        inten = (1.0 - age) ** 1.8
+        if prev is not None and abs(u - head_u) > 0.018:
+            cs.move_to(prev[0], prev[1]); cs.line_to(px, py)
+            cs.set_source_rgba(1, 1, 1, (0.14 + 0.80 * inten) * alpha)
+            cs.set_line_width(2.2); cs.stroke()
+            if inten > 0.55:
+                cg.move_to(prev[0], prev[1]); cg.line_to(px, py)
+                cg.set_source_rgba(1, 1, 1, 0.45 * inten * alpha)
+                cg.set_line_width(4.6); cg.stroke()
+        prev = (px, py)
+
+    head_y = y_mid + _pqrst((head_u * 2.5) % 1.0) * amp
+    cs.arc(head_x, head_y, 4.5, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.98 * alpha); cs.fill()
+    cg.arc(head_x, head_y, 11.0, 0, 2 * math.pi); cg.set_source_rgba(1, 1, 1, 0.78 * alpha); cg.fill()
+    cs.restore(); cg.restore()
+
+
 def draw_tehran_skyline(cs, cg, y_base: float, alpha: float = 1.0, draw_p: float = 1.0):
     """
     @ensan.besham Panel 4 homage: Alborz mountain ridge + Azadi Tower (left) + Milad Tower (right) + skyline blocks!
