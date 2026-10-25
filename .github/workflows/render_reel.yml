@@ -1,0 +1,98 @@
+name: Render Zavieh Zehn Reel (60fps Studio)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - '.github/workflows/render_reel.yml'
+  workflow_dispatch:
+    inputs:
+      episode_script:
+        description: 'Episode module path'
+        required: true
+        default: 'src/episodes/ep02_baader_meinhof.py'
+      release_tag:
+        description: 'GitHub Release tag'
+        required: true
+        default: 'ep02-baader-meinhof'
+      whisper_model:
+        description: 'Whisper alignment model (small or medium)'
+        required: true
+        default: 'medium'
+
+permissions:
+  contents: write
+
+jobs:
+  render-60fps-reel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Studio Audio & Vector Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg rubberband-cli libcairo2
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python Packages & Verify RTL Shaping
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          python -c "from PIL import features; print('Raqm RTL support:', features.check('raqm')); assert features.check('raqm')"
+
+      - name: Fetch Vazirmatn Typography Weights
+        run: |
+          mkdir -p fonts
+          BASE="https://raw.githubusercontent.com/rastikerdar/vazirmatn/master/fonts/ttf"
+          for W in Light Regular Medium Bold ExtraBold; do
+            curl -fsSL "$BASE/Vazirmatn-${W}.ttf" -o "fonts/Vazirmatn-${W}.ttf"
+          done
+          ls -lh fonts/
+
+      - name: Synthesize Voice, Align & Render 1080x1920 @ 60fps Master Reel
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          EP_PATH="${{ github.event.inputs.episode_script || 'src/episodes/ep02_baader_meinhof.py' }}"
+          WHISPER_SZ="${{ github.event.inputs.whisper_model || 'medium' }}"
+          mkdir -p work out qa_report
+          python "$EP_PATH" --cloud-render fonts work out/zavieh_zehn_ep02_baader_meinhof_60fps.mp4 qa_report "$WHISPER_SZ"
+          ffprobe -v error -show_entries format=duration,size,bit_rate:stream=codec_type,codec_name,profile,width,height,r_frame_rate,sample_rate,channels -of json out/zavieh_zehn_ep02_baader_meinhof_60fps.mp4 | tee qa_report/ffprobe_report.json
+
+      - name: Upload 60fps Master MP4 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zavieh-zehn-ep02-baader-meinhof-60fps
+          path: out/zavieh_zehn_ep02_baader_meinhof_60fps.mp4
+          if-no-files-found: error
+
+      - name: Upload QA Frames & Alignment Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zavieh-zehn-ep02-qa-report
+          path: qa_report/
+          if-no-files-found: error
+
+      - name: Publish MP4 to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || 'ep02-baader-meinhof' }}
+          name: "اپیزود ۰۲ — توهم فرکانس (پدیده‌ی بادر-ماینهوف) | 1080x1920 60fps"
+          body: |
+            خروجی استودیویی اپیزود دوم پیج **زاویه ذهن (`@zavieh.penhann`)**
+            - **موضوع:** توهم فرکانس (پدیده‌ی بادر-ماینهوف)
+            - **کیفیت تصویر:** `1080×1920` • `60fps` • `H.264 High Profile (-preset slow -crf 14)`
+            - **مسترینگ صدا:** `Gemini TTS (Iapetus)` + کالیبراسیون باریتون `Rubberband` + فشرده‌سازی هوشمند مکث‌ها + `48kHz / 320kbps Stereo`
+          files: |
+            out/zavieh_zehn_ep02_baader_meinhof_60fps.mp4
+            qa_report/ffprobe_report.json
