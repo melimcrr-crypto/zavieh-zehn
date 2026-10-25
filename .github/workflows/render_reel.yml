@@ -1,4 +1,4 @@
-name: Render Zavieh Zehn Reel (60fps Studio v2)
+name: Render Zavieh Zehn Reel (60fps Studio v2.2)
 
 on:
   push:
@@ -9,13 +9,13 @@ on:
   workflow_dispatch:
     inputs:
       episode_script:
-        description: 'Episode module path'
-        required: true
-        default: 'src/episodes/ep02_baader_meinhof.py'
+        description: 'Episode module path (leave empty for latest episode)'
+        required: false
+        default: ''
       release_tag:
-        description: 'GitHub Release tag'
-        required: true
-        default: 'ep02-baader-meinhof'
+        description: 'GitHub Release tag (leave empty for auto)'
+        required: false
+        default: ''
       whisper_model:
         description: 'Whisper alignment model (small or medium)'
         required: true
@@ -32,6 +32,29 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Resolve Target Episode Metadata
+        id: ep
+        run: |
+          INPUT_EP="${{ github.event.inputs.episode_script }}"
+          if [ -n "$INPUT_EP" ]; then
+            EP_PATH="$INPUT_EP"
+          else
+            EP_PATH=$(ls -1 src/episodes/ep*.py | sort | tail -n 1)
+          fi
+          STEM=$(basename "$EP_PATH" .py)
+          INPUT_TAG="${{ github.event.inputs.release_tag }}"
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG=$(echo "$STEM" | tr '_' '-')
+          fi
+          MP4_NAME="zavieh_zehn_${STEM}_60fps.mp4"
+          echo "ep_path=$EP_PATH" >> $GITHUB_OUTPUT
+          echo "stem=$STEM" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "mp4_name=$MP4_NAME" >> $GITHUB_OUTPUT
+          echo "Resolved: EP_PATH=$EP_PATH | TAG=$TAG | MP4=$MP4_NAME"
 
       - name: Install Studio Audio & Vector Dependencies
         run: |
@@ -59,43 +82,44 @@ jobs:
           done
           ls -lh fonts/
 
-      - name: Synthesize Voice (Rasalgethi + 129-tap FIR), Align & Render 1080x1920 @ 60fps Master Reel
+      - name: Synthesize Locked Rasalgethi Voice, Cinematic Score & Render 1080x1920 @ 60fps Master Reel
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          EP_PATH="${{ github.event.inputs.episode_script || 'src/episodes/ep02_baader_meinhof.py' }}"
+          EP_PATH="${{ steps.ep.outputs.ep_path }}"
+          MP4_NAME="${{ steps.ep.outputs.mp4_name }}"
           WHISPER_SZ="${{ github.event.inputs.whisper_model || 'medium' }}"
           mkdir -p work out qa_report
-          python "$EP_PATH" --cloud-render fonts work out/zavieh_zehn_ep02_baader_meinhof_60fps.mp4 qa_report "$WHISPER_SZ"
-          ffprobe -v error -show_entries format=duration,size,bit_rate:stream=codec_type,codec_name,profile,width,height,r_frame_rate,sample_rate,channels -of json out/zavieh_zehn_ep02_baader_meinhof_60fps.mp4 | tee qa_report/ffprobe_report.json
+          python "$EP_PATH" --cloud-render fonts work "out/$MP4_NAME" qa_report "$WHISPER_SZ"
+          ffprobe -v error -show_entries format=duration,size,bit_rate:stream=codec_type,codec_name,profile,width,height,r_frame_rate,sample_rate,channels -of json "out/$MP4_NAME" | tee qa_report/ffprobe_report.json
 
       - name: Upload 60fps Master MP4 Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: zavieh-zehn-ep02-baader-meinhof-60fps
-          path: out/zavieh_zehn_ep02_baader_meinhof_60fps.mp4
+          name: ${{ steps.ep.outputs.tag }}-60fps
+          path: out/${{ steps.ep.outputs.mp4_name }}
           if-no-files-found: error
 
       - name: Upload QA Sheets & Alignment Report
         uses: actions/upload-artifact@v4
         with:
-          name: zavieh-zehn-ep02-qa-report
+          name: ${{ steps.ep.outputs.tag }}-qa-report
           path: qa_report/
           if-no-files-found: error
 
-      - name: Publish Studio v2 MP4 & QA Sheets to GitHub Releases
+      - name: Publish Studio Master MP4 & QA Sheets to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag || 'ep02-baader-meinhof' }}
-          name: "اپیزود ۰۲ (نسخه استودیویی v2) — توهم فرکانس (بادر-ماینهوف) | 1080x1920 60fps"
+          tag_name: ${{ steps.ep.outputs.tag }}
+          name: "زاویه ذهن (@zavieh.penhann) — ${{ steps.ep.outputs.tag }} | 1080x1920 60fps Studio Master"
           body: |
-            خروجی استودیویی **نسخه v2** اپیزود دوم پیج **زاویه ذهن (`@zavieh.penhann`)**
-            - **موضوع:** توهم فرکانس (پدیده‌ی بادر-ماینهوف)
+            خروجی استودیویی مستر پیج **زاویه ذهن (`@zavieh.penhann`)**
+            - **فایل اپیزود:** `${{ steps.ep.outputs.mp4_name }}`
             - **کیفیت تصویر:** `1080×1920` • `60fps` • `H.264 High@L4.2 (-preset slow -crf 14)` • Pure OLED `#000000`
-            - **موتور زیرنویس v2:** خط واحد RTL با فونت ثابت `Vazirmatn-Medium 40px` قفل‌شده روی خط کرسی `y=1642.0` (`0.000px` خطای تراز) + مسک گرادیانی نرم `64px` راست‌به‌چپ در ۶۰ فریم‌برثانیه
-            - **موتور صوتی v2 (تطبیق آکوستیک `@ensan.besham`):** `Gemini TTS (Rasalgethi)` + فیلتر طیف‌نگاری `129-tap Zero-Phase FIR` + کالیبراسیون `-0.34st Rubberband Formant` (`F0 = 136.4 Hz`, تشابه طیف صوتی `MFCC = 0.9433`) + فشرده‌سازی مکث‌ها به `0.18s` + امبینت دارک `A-minor` در `-32 dBFS`
+            - **صدای ثابت قفل‌شده:** `Gemini TTS (Rasalgethi)` + فیلتر ۱۲۹ تپ `ENSAN_FIR_24K` + `-0.34st Formant`
+            - **موسیقی متن سینمایی:** هارمونی مینور پیش‌رونده (`Am9 -> Fmaj7 -> Dm9 -> Em7`) با پیانوی نمدی و ریورب استریو (`48kHz / 320kbps`)
           files: |
-            out/zavieh_zehn_ep02_baader_meinhof_60fps.mp4
+            out/${{ steps.ep.outputs.mp4_name }}
             qa_report/ffprobe_report.json
             qa_report/alignment.json
             qa_report/subtitle_strip_verify.png

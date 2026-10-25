@@ -196,9 +196,28 @@ def calibrate_baritone_and_tighten(raw_wav: str, tightened_wav: str, dramatic_fr
     return {"duration": round(dur_final, 3), "voiced_pct": round(voiced_pct, 1), "trimmed_pauses": trimmed_count}
 
 
+_NUM_WORDS_FA = [
+    ("100", "صد"), ("۱۰۰", "صد"),
+    ("99", "نودونه"), ("۹۹", "نودونه"),
+    ("60", "شصت"), ("۶۰", "شصت"),
+    ("50", "پنجاه"), ("۵۰", "پنجاه"),
+    ("40", "چهل"), ("۴۰", "چهل"),
+    ("28", "بیستوهشت"), ("۲۸", "بیستوهشت"),
+    ("25", "بیستوپنج"), ("۲۵", "بیستوپنج"),
+    ("20", "بیست"), ("۲۰", "بیست"),
+    ("11", "یازده"), ("۱۱", "یازده"),
+    ("10", "ده"), ("۱۰", "ده"),
+    ("8", "هشت"), ("۸", "هشت"),
+    ("5", "پنج"), ("۵", "پنج"),
+    ("4", "چهار"), ("۴", "چهار"),
+    ("2", "دو"), ("۲", "دو"),
+    ("1", "یک"), ("۱", "یک"),
+]
+
 def _norm_fa(s: str) -> str:
     s = s.replace("ي", "ی").replace("ك", "ک").replace("ة", "ه").replace("ؤ", "و").replace("إ", "ا").replace("أ", "ا").replace("آ", "ا")
-    s = s.replace("99", "نودونه").replace("۹۹", "نودونه").replace("11", "یازده").replace("۱۱", "یازده").replace("40", "چهل").replace("۴۰", "چهل").replace("5", "پنج")
+    for k_num, v_word in _NUM_WORDS_FA:
+        s = s.replace(k_num, v_word)
     s = re.sub(r"[^\u0621-\u06cc0-9۰-۹]", "", s)
     return s
 
@@ -322,22 +341,98 @@ def build_master_stereo_mix(tightened_wav: str, out_master_wav: str, sfx_events:
     dur = N / SR
     t = np.arange(N, dtype=np.float32) / SR
 
-    duck_env = lfilter(*butter(1, 3.0 / (SR / 2), btype="low"), np.abs(vo))
-    duck = np.clip(1.0 - 2.3 * duck_env, 0.38, 1.0)
+    # Smooth broadcast sidechain envelope: ducks score cleanly while Rasalgethi speaks,
+    # and gently blooms during dramatic pauses & the 4.0s @zavieh.penhann outro!
+    vo_env_fast = lfilter(*butter(1, 2.2 / (SR / 2), btype="low"), np.abs(vo))
+    duck = np.clip(1.0 - 2.4 * vo_env_fast, 0.48, 1.0).astype(np.float32)
 
-    # @ensan.besham A-minor dark existential drone (55Hz, 110Hz, 164.8Hz, 220Hz, 246.9Hz) at -32 dBFS
+    # Dark-Cinematic Evolving Score (Minimalist Minor Progression: Am9 -> Fmaj7 -> Dm9 -> Em7)
+    chords = [
+        (55.00,  [110.00, 164.81, 246.94, 261.63], [220.00, 329.63, 261.63, 246.94]), # Am9
+        (43.65,  [87.31,  130.81, 164.81, 220.00], [174.61, 261.63, 329.63, 220.00]), # Fmaj7
+        (36.71,  [73.42,  110.00, 164.81, 174.61], [293.66, 220.00, 349.23, 329.63]), # Dm9
+        (41.20,  [82.41,  123.47, 164.81, 196.00], [246.94, 329.63, 392.00, 293.66]), # Em7
+    ]
     pad_L = np.zeros(N, dtype=np.float32)
     pad_R = np.zeros(N, dtype=np.float32)
-    for i, (f, a) in enumerate([(55.0, 0.30), (110.0, 0.25), (164.81, 0.14), (220.0, 0.11), (246.94, 0.07)]):
-        l1 = 0.78 + 0.22 * np.sin(2 * np.pi * (0.055 + 0.013 * i) * t + i)
-        l2 = 0.78 + 0.22 * np.cos(2 * np.pi * (0.049 + 0.016 * i) * t + i * 1.4)
-        pad_L += a * l1 * np.sin(2 * np.pi * (f * 0.9992) * t)
-        pad_R += a * l2 * np.sin(2 * np.pi * (f * 1.0008) * t + 0.5)
+    piano_dry = np.zeros(N, dtype=np.float32)
+    pulse_sub = np.zeros(N, dtype=np.float32)
 
-    b_lp, a_lp = butter(2, 410.0 / (SR / 2), btype="low")
-    fade = np.clip(t / 1.0, 0, 1) * np.clip((dur - t) / 1.8, 0, 1)
-    pad_L = lfilter(b_lp, a_lp, pad_L) * 0.095 * duck * fade
-    pad_R = lfilter(b_lp, a_lp, pad_R) * 0.095 * duck * fade
+    chord_len = 4.0
+    n_blocks = int(np.ceil(dur / chord_len)) + 1
+    xfade_s = 0.65
+
+    for bi in range(n_blocks):
+        t_start = bi * chord_len - xfade_s
+        t_end   = (bi + 1) * chord_len + xfade_s
+        i0 = max(0, int(t_start * SR))
+        i1 = min(N, int(t_end * SR))
+        if i1 <= i0:
+            continue
+        bt = np.arange(i0, i1, dtype=np.float32) / SR
+        w_in  = np.clip((bt - (bi * chord_len - xfade_s)) / (2 * xfade_s), 0.0, 1.0)
+        w_out = np.clip((((bi + 1) * chord_len + xfade_s) - bt) / (2 * xfade_s), 0.0, 1.0)
+        win = (0.5 - 0.5 * np.cos(np.pi * w_in)) * (0.5 - 0.5 * np.cos(np.pi * w_out))
+
+        f_bass, pad_freqs, arp_notes = chords[bi % 4]
+
+        # 1. Warm analog cello-pad ensemble (fundamental + octave + soft 3rd harmonic, stereo detuned)
+        cL = 0.34 * np.sin(2 * np.pi * f_bass * bt)
+        cR = 0.34 * np.sin(2 * np.pi * f_bass * bt + 0.15)
+        for vi, pf in enumerate(pad_freqs):
+            sw = 0.82 + 0.18 * np.sin(2 * np.pi * (0.14 + 0.03 * vi) * bt + vi)
+            fL, fR = pf * 0.9984, pf * 1.0016
+            cL += sw * (0.20 * np.sin(2*np.pi*fL*bt + vi) + 0.08 * np.sin(4*np.pi*fL*bt) + 0.03 * np.sin(6*np.pi*fL*bt))
+            cR += sw * (0.20 * np.sin(2*np.pi*fR*bt + vi + 0.6) + 0.08 * np.sin(4*np.pi*fR*bt + 0.4) + 0.03 * np.sin(6*np.pi*fR*bt))
+        pad_L[i0:i1] += (cL * win).astype(np.float32)
+        pad_R[i0:i1] += (cR * win).astype(np.float32)
+
+        # 2. Delicate felt-piano / glass motif (sparse half-note droplets every 2.0s)
+        for step_k in range(2):
+            nt_t0 = bi * chord_len + step_k * 2.0 + 0.12
+            ni0 = int(nt_t0 * SR)
+            ndur = int(2.3 * SR)
+            if 0 <= ni0 < N - 400:
+                ni1 = min(N, ni0 + ndur)
+                nt = np.arange(ni1 - ni0, dtype=np.float32) / SR
+                nf = arp_notes[(bi + step_k * 2) % len(arp_notes)]
+                att = np.clip(nt / 0.022, 0.0, 1.0)
+                tone = att * (
+                    np.sin(2 * np.pi * nf * nt) * np.exp(-nt * 2.1)
+                    + 0.30 * np.sin(2 * np.pi * (nf * 2.0) * nt) * np.exp(-nt * 3.8)
+                    + 0.08 * np.sin(2 * np.pi * (nf * 3.0) * nt) * np.exp(-nt * 6.5)
+                )
+                piano_dry[ni0:ni1] += (tone * 0.30).astype(np.float32)
+
+            # 3. Subtle deep heartbeat sub-pulse every 2.0s (quiet forward momentum)
+            pi0 = int((bi * chord_len + step_k * 2.0) * SR)
+            pdur = int(0.42 * SR)
+            if 0 <= pi0 < N - 400:
+                pi1 = min(N, pi0 + pdur)
+                pt = np.arange(pi1 - pi0, dtype=np.float32) / SR
+                p_env = np.clip(pt / 0.018, 0.0, 1.0) * np.exp(-pt * 8.5)
+                pulse_sub[pi0:pi1] += (np.sin(2 * np.pi * (58.0 - 22.0 * pt) * pt) * p_env * 0.36).astype(np.float32)
+
+    # Filter warm cello-string pad below 780 Hz (audible on mobile speakers, zero clash with 2-5kHz speech clarity!)
+    b_pad, a_pad = butter(3, 780.0 / (SR / 2), btype="low")
+    pad_L = lfilter(b_pad, a_pad, pad_L)
+    pad_R = lfilter(b_pad, a_pad, pad_R)
+
+    # Filter felt piano below 1550 Hz + stereo multi-tap hall reverb
+    b_pno, a_pno = butter(2, 1550.0 / (SR / 2), btype="low")
+    piano_flt = lfilter(b_pno, a_pno, piano_dry)
+    rev_L = piano_flt.copy()
+    rev_R = piano_flt.copy()
+    for d_ms, g_l, g_r in [(41, 0.48, 0.26), (79, 0.26, 0.46), (137, 0.32, 0.20), (211, 0.18, 0.30)]:
+        ds = int(d_ms * 0.001 * SR)
+        if ds < N:
+            rev_L[ds:] += piano_flt[:-ds] * g_l
+            rev_R[ds:] += piano_flt[:-ds] * g_r
+
+    fade = (np.clip(t / 0.7, 0.0, 1.0) * np.clip((dur - t) / 1.6, 0.0, 1.0)).astype(np.float32)
+    score_gain = 0.255
+    pad_L = (pad_L + rev_L * 0.68 + pulse_sub * 0.48) * score_gain * duck * fade
+    pad_R = (pad_R + rev_R * 0.68 + pulse_sub * 0.48) * score_gain * duck * fade
 
     sfx_L = np.zeros(N, dtype=np.float32)
     sfx_R = np.zeros(N, dtype=np.float32)
