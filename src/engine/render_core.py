@@ -570,6 +570,97 @@ def draw_safe_card(
         text_overlays.append((sp, cx, cy + dy, alpha))
 
 
+_AMBIENT_SEEDS = [
+    ((i * 173 + 91) % 940 + 70, (i * 293 + 211) % 1220 + 210, 1.0 + (i % 3) * 0.55, 0.35 + (i % 5) * 0.14, i * 1.13)
+    for i in range(28)
+]
+
+def draw_ambient_particles(cs, t: float, alpha: float = 1.0):
+    """Subtle 60fps floating OLED micro-dust that gives continuous spatial depth across scenes."""
+    if alpha <= 0.01:
+        return
+    cs.save()
+    cs.set_dash([])
+    for bx, by, rad, spd, ph in _AMBIENT_SEEDS:
+        px = bx + math.sin(t * spd + ph) * 18.0
+        py = 210 + ((by - 210 - t * (9.0 + spd * 14.0)) % 1220.0)
+        twk = 0.05 + 0.09 * (0.5 + 0.5 * math.sin(t * 2.1 + ph * 2.0))
+        cs.arc(px, py, rad, 0, 2 * math.pi)
+        cs.set_source_rgba(1, 1, 1, twk * alpha)
+        cs.fill()
+    cs.restore()
+
+
+def draw_curved_arrow(
+    ctx, x0: float, y0: float, x1: float, y1: float, bend: float = -75.0,
+    progress: float = 1.0, alpha: float = 1.0, lw: float = 2.4
+):
+    """Progressive quadratic Bézier arc + auto-oriented arrowhead at leading tip!"""
+    p = clamp(progress)
+    if p <= 0.01 or alpha <= 0.01:
+        return
+    mx = 0.5 * (x0 + x1)
+    my = 0.5 * (y0 + y1) + bend
+    # Sample N points up to parameter p for crisp partial drawing + exact tangent at tip
+    N = 32
+    ctx.save()
+    ctx.set_dash([])
+    ctx.set_source_rgba(1, 1, 1, alpha)
+    ctx.set_line_width(lw)
+    pts = []
+    for k in range(N + 1):
+        u = (k / N) * p
+        px = (1 - u) ** 2 * x0 + 2 * (1 - u) * u * mx + u ** 2 * x1
+        py = (1 - u) ** 2 * y0 + 2 * (1 - u) * u * my + u ** 2 * y1
+        pts.append((px, py))
+    ctx.move_to(*pts[0])
+    for px, py in pts[1:]:
+        ctx.line_to(px, py)
+    ctx.stroke()
+
+    if len(pts) >= 2:
+        tx, ty = pts[-1]
+        px_prev, py_prev = pts[-2]
+        ang = math.atan2(ty - py_prev, tx - px_prev)
+        ah = 13.0
+        ctx.move_to(tx, ty)
+        ctx.line_to(tx - ah * math.cos(ang - 0.48), ty - ah * math.sin(ang - 0.48))
+        ctx.move_to(tx, ty)
+        ctx.line_to(tx - ah * math.cos(ang + 0.48), ty - ah * math.sin(ang + 0.48))
+        ctx.stroke()
+    ctx.restore()
+
+
+def draw_cursor_pointer(cs, cg, x: float, y: float, click_p: float = 0.0, alpha: float = 1.0, scale: float = 1.0):
+    """Sleek vector arrow cursor + expanding concentric sonar click-ripples!"""
+    if alpha <= 0.01:
+        return
+    press_sc = scale * (1.0 - 0.16 * math.sin(math.pi * clamp(click_p * 2.0)) if 0.0 < click_p < 0.5 else 1.0)
+    for ctx, lw, al in ((cs, 2.3, alpha * 0.98), (cg, 5.0, alpha * 0.65)):
+        ctx.save()
+        ctx.set_dash([])
+        ctx.translate(x, y)
+        ctx.scale(press_sc, press_sc)
+        if ctx is cs:
+            ctx.move_to(0, 0); ctx.line_to(0, 38); ctx.line_to(11, 29); ctx.line_to(20, 46)
+            ctx.line_to(27, 42); ctx.line_to(18, 25); ctx.line_to(31, 25); ctx.close_path()
+            ctx.set_source_rgba(0.03, 0.03, 0.04, 0.95 * alpha); ctx.fill_preserve()
+        else:
+            ctx.move_to(0, 0); ctx.line_to(0, 38); ctx.line_to(11, 29); ctx.line_to(20, 46)
+            ctx.line_to(27, 42); ctx.line_to(18, 25); ctx.line_to(31, 25); ctx.close_path()
+        ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw); ctx.stroke()
+        ctx.restore()
+
+    if 0.01 < click_p < 0.99:
+        for mult in (1.0, 0.62):
+            rp = clamp(click_p / mult)
+            if rp < 1.0:
+                rr = 10.0 + rp * 68.0
+                ra = (1.0 - rp) * 0.78 * alpha
+                cs.arc(x, y, rr, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, ra); cs.set_line_width(1.9); cs.stroke()
+                cg.arc(x, y, rr, 0, 2 * math.pi); cg.set_source_rgba(1, 1, 1, ra * 0.55); cg.set_line_width(4.0); cg.stroke()
+
+
 def draw_tehran_skyline(cs, cg, y_base: float, alpha: float = 1.0, draw_p: float = 1.0):
     """
     @ensan.besham Panel 4 homage: Alborz mountain ridge + Azadi Tower (left) + Milad Tower (right) + skyline blocks!
