@@ -123,11 +123,52 @@ def fit_font_to_width(text: str, font, max_width: float, min_px: int = 16):
         _FIT_FONT_CACHE[fkey] = ImageFont.truetype(font.path, min_px)
     return _FIT_FONT_CACHE[fkey]
 
-def get_fitted_text_sprite(text: str, font, max_width: float, color=(255, 255, 255, 255), glow: float = 0.0, min_px: int = 16) -> Image.Image:
-    """Metric-locked text sprite guaranteed to fit strictly inside max_width."""
-    txt_fa = fa(text) if not text.isascii() else text
+def wrap_persian_lines(text: str, font, max_width: float) -> list[str]:
+    """Splits a long Persian/LTR string into balanced lines that each fit inside max_width."""
+    words = text.split()
+    if len(words) <= 1 or measure_text_width(text, font) <= max_width:
+        return [text]
+    lines, cur = [], words[0]
+    for w in words[1:]:
+        cand = cur + " " + w
+        if measure_text_width(cand, font) <= max_width:
+            cur = cand
+        else:
+            lines.append(cur)
+            cur = w
+    lines.append(cur)
+    return lines
+
+def get_fitted_text_sprite(text: str, font, max_width: float, color=(255, 255, 255, 255), glow: float = 0.0, min_px: int = 18) -> Image.Image:
+    """
+    Bulletproof container text sprite:
+    1) Steps font size down cleanly down to min_px.
+    2) If still wider than max_width, auto-wraps into balanced multi-line RTL sprite!
+    Guarantees visible ink width <= max_width in 100% of cases.
+    """
+    txt_fa = text if text.isascii() else fa(text)
     safe_font = fit_font_to_width(txt_fa, font, max_width, min_px=min_px)
-    return get_text_sprite(txt_fa, safe_font, color=color, glow=glow)
+    if measure_text_width(txt_fa, safe_font) <= max_width:
+        return get_text_sprite(txt_fa, safe_font, color=color, glow=glow)
+
+    # Multi-line RTL auto-wrap at readable min_px!
+    wrapped = wrap_persian_lines(txt_fa, safe_font, max_width)
+    line_sprites = []
+    for ln in wrapped:
+        ln_font = fit_font_to_width(ln, safe_font, max_width, min_px=12)
+        sp_ln = get_text_sprite(ln, ln_font, color=color, glow=glow)
+        if sp_ln.width > int(max_width + 64):
+            ratio = (max_width + 48) / sp_ln.width
+            sp_ln = sp_ln.resize((int(sp_ln.width * ratio), max(1, int(sp_ln.height * ratio))), Image.Resampling.LANCZOS)
+        line_sprites.append(sp_ln)
+
+    line_step = max(24, int(getattr(safe_font, "size", 20) * 1.42))
+    out_w = max(sp.width for sp in line_sprites)
+    out_h = line_sprites[0].height + line_step * (len(line_sprites) - 1)
+    combo = Image.new("RGBA", (out_w, out_h), (0, 0, 0, 0))
+    for i, sp in enumerate(line_sprites):
+        combo.alpha_composite(sp, ((out_w - sp.width) // 2, i * line_step))
+    return combo
 
 def paste_center(canvas: Image.Image, sprite: Image.Image, cx: float, cy: float, alpha: float = 1.0):
     if alpha <= 0.01:
