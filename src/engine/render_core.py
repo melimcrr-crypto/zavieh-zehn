@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 W, H = 1080, 1920
 FPS = 60
+SAFE_MARGIN_X = 64.0  # Strict horizontal screen safe-zone [64 .. 1016]
 
 FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 def fa(s) -> str:
@@ -93,6 +94,41 @@ def get_text_sprite(text: str, font, color=(255, 255, 255, 255), glow: float = 0
     return out
 
 
+
+_FIT_FONT_CACHE = {}
+
+def measure_text_width(text: str, font) -> float:
+    t_dir = "ltr" if text.isascii() else "rtl"
+    dummy = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+    bb = ImageDraw.Draw(dummy).textbbox((0, 0), text, font=font, direction=t_dir, language="fa")
+    return float(bb[2] - bb[0])
+
+def fit_font_to_width(text: str, font, max_width: float, min_px: int = 16):
+    """Automatically steps down font size if text exceeds max_width -> 0.0px overflow guaranteed!"""
+    w = measure_text_width(text, font)
+    if w <= max_width or not hasattr(font, "path"):
+        return font
+    cur_sz = getattr(font, "size", 28)
+    est_sz = max(min_px, int(cur_sz * (max_width / max(1.0, w)) * 0.97))
+    while est_sz > min_px:
+        fkey = (font.path, est_sz)
+        if fkey not in _FIT_FONT_CACHE:
+            _FIT_FONT_CACHE[fkey] = ImageFont.truetype(font.path, est_sz)
+        cand = _FIT_FONT_CACHE[fkey]
+        if measure_text_width(text, cand) <= max_width:
+            return cand
+        est_sz -= 1
+    fkey = (font.path, min_px)
+    if fkey not in _FIT_FONT_CACHE:
+        _FIT_FONT_CACHE[fkey] = ImageFont.truetype(font.path, min_px)
+    return _FIT_FONT_CACHE[fkey]
+
+def get_fitted_text_sprite(text: str, font, max_width: float, color=(255, 255, 255, 255), glow: float = 0.0, min_px: int = 16) -> Image.Image:
+    """Metric-locked text sprite guaranteed to fit strictly inside max_width."""
+    txt_fa = fa(text) if not text.isascii() else text
+    safe_font = fit_font_to_width(txt_fa, font, max_width, min_px=min_px)
+    return get_text_sprite(txt_fa, safe_font, color=color, glow=glow)
+
 def paste_center(canvas: Image.Image, sprite: Image.Image, cx: float, cy: float, alpha: float = 1.0):
     if alpha <= 0.01:
         return
@@ -100,7 +136,7 @@ def paste_center(canvas: Image.Image, sprite: Image.Image, cx: float, cy: float,
         r, g, b, a = sprite.split()
         a = a.point(lambda p: int(p * alpha))
         sprite = Image.merge("RGBA", (r, g, b, a))
-    x = int(round(cx - sprite.width / 2.0))
+    x = int(round(clamp(cx - sprite.width / 2.0, 16.0, W - sprite.width - 16.0)))
     y = int(round(cy - sprite.height / 2.0))
     canvas.alpha_composite(sprite, (x, y))
 
@@ -331,18 +367,21 @@ def draw_human_figure(
 
 def draw_pill_badge(
     cs, cg, text_overlays: list, text: str, cx: float, cy: float,
-    font, alpha: float = 1.0, glow: bool = False, pad_x: float = 26.0, pad_y: float = 11.0
+    font, alpha: float = 1.0, glow: bool = False, pad_x: float = 30.0, pad_y: float = 13.0, max_box_w: float = 920.0
 ):
-    """Exact @ensan.besham bordered pill tag ([ ۱۳۹۷ ], [ لیست ویژه ], [ پرونده ۰۲ ])."""
+    """Exact @ensan.besham bordered pill tag with automatic text-fit & screen-margin clamp (0px overflow!)."""
     if alpha <= 0.01:
         return
-    sp = get_text_sprite(fa(text), font, (250, 250, 255, 255) if glow else (210, 210, 220, 255), glow=0.55 if glow else 0.0)
-    # Estimate clean pill box around text
+    disp_txt = text if text.isascii() else fa(text)
+    pad_x = max(24.0, pad_x)
+    safe_font = fit_font_to_width(disp_txt, font, max_box_w - pad_x * 2)
+    sp = get_text_sprite(disp_txt, safe_font, (250, 250, 255, 255) if glow else (210, 210, 220, 255), glow=0.55 if glow else 0.0)
     dummy = Image.new("RGBA", (4, 4))
-    t_dir = "ltr" if text.isascii() else "rtl"
-    bb = ImageDraw.Draw(dummy).textbbox((0, 0), fa(text), font=font, direction=t_dir, language="fa")
+    t_dir = "ltr" if disp_txt.isascii() else "rtl"
+    bb = ImageDraw.Draw(dummy).textbbox((0, 0), disp_txt, font=safe_font, direction=t_dir, language="fa")
     bw = (bb[2] - bb[0]) + pad_x * 2
     bh = (bb[3] - bb[1]) + pad_y * 2
+    cx = clamp(cx, SAFE_MARGIN_X + bw / 2.0, W - SAFE_MARGIN_X - bw / 2.0)
 
     cs.save()
     cs.set_dash([])
@@ -376,10 +415,11 @@ def draw_folder_window(
         return
     x0, y0 = cx - w / 2.0, cy - h / 2.0
     x1, y1 = cx + w / 2.0, cy + h / 2.0
+    safe_tab_font = fit_font_to_width(fa(tab_label), font_tab, max(120.0, w - 120.0))
     dummy_tb = Image.new("RGBA", (4, 4))
-    bb_tb = ImageDraw.Draw(dummy_tb).textbbox((0, 0), fa(tab_label), font=font_tab, direction="rtl", language="fa")
-    tab_w = max(175.0, float(bb_tb[2] - bb_tb[0]) + 58.0)
-    tab_h = 42.0
+    bb_tb = ImageDraw.Draw(dummy_tb).textbbox((0, 0), fa(tab_label), font=safe_tab_font, direction="rtl", language="fa")
+    tab_w = clamp(float(bb_tb[2] - bb_tb[0]) + 68.0, 175.0, w - 70.0)
+    tab_h = 44.0
 
     for ctx, lw, al in ((cs, 2.0, alpha * 0.78), (cg, 4.5, alpha * 0.32)):
         ctx.save()
@@ -402,7 +442,7 @@ def draw_folder_window(
         ctx.restore()
 
     if draw_p > 0.35:
-        sp_tb = get_text_sprite(fa(tab_label), font_tab, (235, 235, 242, 255), glow=0.25)
+        sp_tb = get_text_sprite(fa(tab_label), safe_tab_font, (235, 235, 242, 255), glow=0.25)
         text_overlays.append((sp_tb, x1 - tab_w / 2.0, y0 - tab_h / 2.0 + 2, alpha * clamp((draw_p - 0.35) / 0.4)))
 
 
@@ -441,6 +481,52 @@ def draw_stamp_badge(
     sp = get_text_sprite(fa(text), font, (255, 255, 255, 255), glow=0.65)
     sp_rot = sp.rotate(-angle_deg, resample=Image.Resampling.BICUBIC, expand=True)
     text_overlays.append((sp_rot, cx, cy, alpha * clamp(pop_p * 1.8)))
+
+
+
+
+def draw_safe_card(
+    cs, cg, text_overlays: list, cx: float, cy: float, w: float, h: float,
+    lines_spec: list[tuple], radius: float = 12.0, pad_x: float = 28.0,
+    alpha: float = 1.0, glow_border: bool = False, allow_expand: bool = True, max_w: float = 920.0
+):
+    """
+    Universal overflow-proof card container for @zavieh.penhann scenes!
+    lines_spec: list of (text, font, y_offset_from_cy, color_rgba, glow_float)
+    Guarantees every line stays strictly inside [cx - w/2 + pad_x .. cx + w/2 - pad_x]
+    and clamps card inside [SAFE_MARGIN_X .. W - SAFE_MARGIN_X].
+    """
+    if alpha <= 0.01:
+        return
+    pad_x = max(24.0, pad_x)
+    req_w = w
+    if allow_expand and lines_spec:
+        widest = max(measure_text_width(t if t.isascii() else fa(t), fnt) for (t, fnt, _, _, _) in lines_spec)
+        req_w = min(max_w, max(w, widest + pad_x * 2))
+    cx = clamp(cx, SAFE_MARGIN_X + req_w / 2.0, W - SAFE_MARGIN_X - req_w / 2.0)
+
+    cs.save()
+    cs.set_dash([])
+    rounded_rect_path(cs, cx - req_w / 2.0, cy - h / 2.0, req_w, h, radius)
+    cs.set_source_rgba(0.03, 0.03, 0.04, 0.92 * alpha)
+    cs.fill_preserve()
+    cs.set_source_rgba(1, 1, 1, (0.84 if glow_border else 0.68) * alpha)
+    cs.set_line_width(2.1 if glow_border else 1.7)
+    cs.stroke()
+    cs.restore()
+
+    if glow_border:
+        cg.save()
+        rounded_rect_path(cg, cx - req_w / 2.0, cy - h / 2.0, req_w, h, radius)
+        cg.set_source_rgba(1, 1, 1, 0.42 * alpha)
+        cg.set_line_width(4.2)
+        cg.stroke()
+        cg.restore()
+
+    inner_max_w = max(60.0, req_w - pad_x * 2)
+    for (txt, fnt, dy, col, glw) in lines_spec:
+        sp = get_fitted_text_sprite(txt, fnt, inner_max_w, color=col, glow=glw)
+        text_overlays.append((sp, cx, cy + dy, alpha))
 
 
 def draw_tehran_skyline(cs, cg, y_base: float, alpha: float = 1.0, draw_p: float = 1.0):

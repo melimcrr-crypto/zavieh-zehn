@@ -5,12 +5,19 @@ from faster_whisper import WhisperModel
 
 SR = 48000
 
+# =============================================================================
+# LOCKED PERMANENT STUDIO VOICE PROFILE (@zavieh.penhann) — DO NOT CHANGE
+# Approved Signature Voice: Google Gemini TTS 'Rasalgethi' + 129-tap FIR + -0.34st
+# =============================================================================
+LOCKED_SIGNATURE_VOICE = "Rasalgethi"
+LOCKED_PITCH_SEMITONES = -0.34
+
 # 129-tap zero-phase FIR Spectral-Match Filter calibrated directly from @ensan.besham 24kHz vocal spectrum
 # Raises Rasalgethi vocal-tract MFCC cosine similarity from 0.9267 -> 0.9433 (same-speaker baseline = 0.9483)
 ENSAN_FIR_24K = np.array([-0.0005067, -0.0002063, -0.0004955, -0.0003398, -0.0005293, -0.0004746, -0.0002872, -0.0008459, -0.000192, -0.0011662, -0.0010099, 8.35e-05, -0.0015138, -0.0003597, -0.0005746, -0.0008309, -1.37e-05, -0.0021142, 0.0010012, -0.0028506, -0.0005282, 8.65e-05, -0.0018366, -0.0037866, 0.0034279, -0.0036828, -0.0029989, -0.0056234, 0.0049263, 0.0030251, -0.0004988, 0.0200145, -0.0043036, 0.0144986, -0.00375, 0.0234321, 0.0101375, -0.01161, -0.0074743, -0.0044483, -0.0037258, -0.0070539, 0.0288942, 0.0246944, 0.0090061, -0.0485853, -0.0230289, -0.1008084, -0.0463893, 0.007358, 0.0301322, 0.0867738, -0.0110539, 0.106049, -0.034189, 0.003802, -0.0320421, 0.016142, -0.0234598, 0.0593752, -0.2091388, 0.0956894, 0.0014732, -0.0254879, 1.6445446, -0.0254879, 0.0014732, 0.0956894, -0.2091388, 0.0593752, -0.0234598, 0.016142, -0.0320421, 0.003802, -0.034189, 0.106049, -0.0110539, 0.0867738, 0.0301322, 0.007358, -0.0463893, -0.1008084, -0.0230289, -0.0485853, 0.0090061, 0.0246944, 0.0288942, -0.0070539, -0.0037258, -0.0044483, -0.0074743, -0.01161, 0.0101375, 0.0234321, -0.00375, 0.0144986, -0.0043036, 0.0200145, -0.0004988, 0.0030251, 0.0049263, -0.0056234, -0.0029989, -0.0036828, 0.0034279, -0.0037866, -0.0018366, 8.65e-05, -0.0005282, -0.0028506, 0.0010012, -0.0021142, -1.37e-05, -0.0008309, -0.0005746, -0.0003597, -0.0015138, 8.35e-05, -0.0010099, -0.0011662, -0.000192, -0.0008459, -0.0002872, -0.0004746, -0.0005293, -0.0003398, -0.0004955, -0.0002063, -0.0005067], dtype=np.float64)
 
 
-def synthesize_gemini_tts(text: str, out_raw_wav: str, voice: str = "Rasalgethi") -> dict:
+def synthesize_gemini_tts(text: str, out_raw_wav: str, voice: str = LOCKED_SIGNATURE_VOICE) -> dict:
     """
     Synthesizes Persian narration using Gemini TTS ('Rasalgethi': 139.1Hz natural F0,
     0.836 Whisper Tehrani clarity, 0.9433 spectral-matched vocal-tract similarity to @ensan.besham).
@@ -92,7 +99,7 @@ def calibrate_baritone_and_tighten(raw_wav: str, tightened_wav: str, dramatic_fr
     has_rb = subprocess.call(["which", "rubberband"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
     if has_rb:
         rb_tmp = raw_wav.replace(".wav", "_rb.wav")
-        subprocess.check_call(["rubberband", "-q", "--pitch", "-0.34", "--formant", raw_wav, rb_tmp])
+        subprocess.check_call(["rubberband", "-q", "--pitch", str(LOCKED_PITCH_SEMITONES), "--formant", raw_wav, rb_tmp])
         subprocess.check_call(["ffmpeg", "-y", "-i", rb_tmp, "-ar", str(SR), "-ac", "1", "-c:a", "pcm_s16le", cal_wav], stderr=subprocess.DEVNULL)
     else:
         subprocess.check_call(["ffmpeg", "-y", "-i", raw_wav, "-ar", str(SR), "-ac", "1", "-c:a", "pcm_s16le", cal_wav], stderr=subprocess.DEVNULL)
@@ -411,7 +418,7 @@ def build_episode_audio(
     segments: list[tuple[str, str]],
     sfx_cue_map: list[tuple[str, int, int, str]],
     work_dir: str,
-    voice_name: str = "Rasalgethi",
+    voice_name: str = LOCKED_SIGNATURE_VOICE,
     tail_pad_sec: float = 4.0,
     whisper_size: str = "medium",
 ) -> dict:

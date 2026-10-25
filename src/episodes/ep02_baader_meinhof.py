@@ -10,10 +10,10 @@ import os, sys, json, math, time, subprocess
 import cairocffi as cairo
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from src.engine.audio_master import build_episode_audio
+from src.engine.audio_master import build_episode_audio, LOCKED_SIGNATURE_VOICE
 from src.engine.render_core import (
     W, H, FPS, fa, clamp, ease_out_cubic, ease_in_out_cubic, spring_pop, window_fade,
-    FontBank, get_text_sprite, set_stroke_draw, rounded_rect_path, draw_star4, draw_stipple_line,
+    FontBank, get_text_sprite, get_fitted_text_sprite, set_stroke_draw, rounded_rect_path, draw_star4, draw_stipple_line,
     draw_human_figure, draw_pill_badge, draw_folder_window, draw_stamp_badge,
     draw_tehran_skyline, draw_spotlight_cone, draw_hud_chrome, composite_oled_frame
 )
@@ -251,7 +251,7 @@ def render_scene_frame(
             cg.set_source_rgba(1, 1, 1, 0.35 * al); cg.set_line_width(4.0); cg.stroke()
 
             draw_car_icon(cs, nx, ny - 12, sc=0.68 * act, alpha=0.92 * al, lw=2.0)
-            sp_n = get_text_sprite(lbl, fonts.light_22, (205, 205, 215, 255))
+            sp_n = get_fitted_text_sprite(lbl, fonts.light_22, max(80.0, cw - 34.0), color=(205, 205, 215, 255))
             txts.append((sp_n, nx, ny + 34, al))
 
             # Dotted ray converging straight into observer's mind!
@@ -598,8 +598,8 @@ def render_scene_frame(
             rounded_rect_path(cg, mx - mw / 2, my - mh / 2, mw, mh, 10)
             cg.set_source_rgba(1, 1, 1, 0.38 * w8 * mp); cg.set_line_width(4.2); cg.stroke()
 
-            sp_mt = get_text_sprite(m_title, fonts.bold_30, (255, 255, 255, 255), glow=0.45)
-            sp_ms = get_text_sprite(m_sub, fonts.light_22, (190, 190, 200, 255))
+            sp_mt = get_fitted_text_sprite(m_title, fonts.bold_30, max(90.0, mw - 38.0), color=(255, 255, 255, 255), glow=0.45)
+            sp_ms = get_fitted_text_sprite(m_sub, fonts.light_22, max(90.0, mw - 38.0), color=(190, 190, 200, 255))
             txts.append((sp_mt, mx, my - 24, w8 * mp))
             txts.append((sp_ms, mx, my + 32, w8 * mp))
 
@@ -777,7 +777,7 @@ def run_cloud_render(font_dir: str, work_dir: str, out_mp4: str, qa_dir: str, wh
         segments=SCRIPT_SEGMENTS,
         sfx_cue_map=SFX_CUE_MAP,
         work_dir=work_dir,
-        voice_name="Rasalgethi",
+        voice_name=LOCKED_SIGNATURE_VOICE,
         tail_pad_sec=4.0,
         whisper_size=whisper_size,
     )

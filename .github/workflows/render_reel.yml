@@ -4,8 +4,8 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'src/**'
-      - '.github/workflows/render_reel.yml'
+      - 'src/episodes/ep0[3-9]*.py'
+      - 'src/episodes/ep[1-9]*.py'
   workflow_dispatch:
     inputs:
       episode_script:
