@@ -92,6 +92,7 @@ jobs:
           mkdir -p work out qa_report
           python "$EP_PATH" --cloud-render fonts work "out/$MP4_NAME" qa_report "$WHISPER_SZ"
           ffprobe -v error -show_entries format=duration,size,bit_rate:stream=codec_type,codec_name,profile,width,height,r_frame_rate,sample_rate,channels -of json "out/$MP4_NAME" | tee qa_report/ffprobe_report.json
+          ffmpeg -hide_banner -i "out/$MP4_NAME" -af "volumedetect" -f null - 2>&1 | grep -E "mean_volume|max_volume|histogram" | tee qa_report/loudness_report.txt
 
       - name: Upload 60fps Master MP4 Artifact
         uses: actions/upload-artifact@v4
@@ -121,6 +122,7 @@ jobs:
           files: |
             out/${{ steps.ep.outputs.mp4_name }}
             qa_report/ffprobe_report.json
+            qa_report/loudness_report.txt
             qa_report/alignment.json
             qa_report/subtitle_strip_verify.png
             qa_report/storyboard_12_scenes.png
