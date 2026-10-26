@@ -172,8 +172,21 @@ def calibrate_baritone_and_tighten(raw_wav: str, tightened_wav: str, dramatic_fr
             else:
                 pieces.append(seg)
 
-    pieces.append(np.zeros(int(tail_pad_sec * SR), dtype=np.float32))
-    out_x = np.concatenate(pieces)
+    voiced_body = np.concatenate(pieces)
+    voiced_dur = len(voiced_body) / SR
+    if has_rb and voiced_dur > 61.5:
+        t_ratio = max(0.80, 59.5 / voiced_dur)
+        vb_in = raw_wav.replace(".wav", "_vbin.wav")
+        vb_out = raw_wav.replace(".wav", "_vbout.wav")
+        with wave.open(vb_in, "wb") as wf:
+            wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(SR)
+            wf.writeframes((np.clip(voiced_body, -0.98, 0.98) * 32767).astype(np.int16).tobytes())
+        subprocess.check_call(["rubberband", "-q", "--time", f"{t_ratio:.4f}", "--formant", vb_in, vb_out])
+        with wave.open(vb_out, "rb") as wf:
+            voiced_body = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
+        print(f"[Audio] Formant-locked cadence polish: {voiced_dur:.2f}s -> {len(voiced_body)/SR:.2f}s (ratio={t_ratio:.3f})", flush=True)
+
+    out_x = np.concatenate([voiced_body, np.zeros(int(tail_pad_sec * SR), dtype=np.float32)])
 
     # Gentle broadcast leveling (-17.2 dBFS RMS target matching @ensan.besham!)
     env = lfilter(*butter(1, 12.0 / (SR / 2), btype="low"), np.abs(out_x)) + 1e-6
@@ -845,7 +858,7 @@ def build_master_stereo_mix(tightened_wav: str, out_master_wav: str, sfx_events:
 
     raw_L = vo + mus_L + sfx_L
     raw_R = vo + mus_R + sfx_R
-    mix_L, mix_R = _lookahead_broadcast_limiter(raw_L, raw_R, ceiling=0.955)
+    mix_L, mix_R = _lookahead_broadcast_limiter(raw_L, raw_R, ceiling=0.900)
 
     stereo = np.empty((N * 2,), dtype=np.int16)
     stereo[0::2] = (np.clip(mix_L, -0.98, 0.98) * 32767).astype(np.int16)
