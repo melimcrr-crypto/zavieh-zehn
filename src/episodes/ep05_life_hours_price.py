@@ -329,6 +329,40 @@ def _shot_cam_z(t: float, t0: float, t1: float, base_in: float = 0.92) -> float:
     return z_in + z_drift + z_out
 
 
+def _compute_shot_bounds(tc: dict, outro_t0: float) -> list[float]:
+    raw = [
+        0.0,
+        tc["c02_pov"],
+        tc["c03_p50"],
+        tc["c04_eye"],
+        tc["c05_slash"],
+        tc["c06_600"] - 0.12,
+        tc["c07_paper"],
+        tc["c08_chest"],
+        tc["c09_crumble"] - 0.10,
+        tc["c10_desk"],
+        tc["c11_100k"] - 0.10,
+        tc["c12_iphone"],
+        tc["c13_75d"] - 0.10,
+        tc["c14_season"],
+        tc["c15_glasses"],
+        tc["c16_shoe"],
+        tc["c17_dinner"],
+        tc["c18_envy"],
+        tc["c19_boulder"],
+        tc["c20_puppet"] - 0.10,
+        tc["c21_filter"],
+        tc["c22_free"] - 0.10,
+        tc["c23_cta"],
+        outro_t0,
+    ]
+    sb = [0.0]
+    for v in raw[1:-1]:
+        sb.append(max(sb[-1] + 0.70, float(v)))
+    sb.append(max(sb[-1] + 0.90, float(outro_t0)))
+    return sb
+
+
 def render_scene_frame(
     t: float, total_dur: float, tc: dict, sub_lines: list[dict],
     fonts: FontBank, surf_glow, ctx_glow, surf_sharp, ctx_sharp
@@ -345,30 +379,8 @@ def render_scene_frame(
     outro_t0 = total_dur - 4.0
 
     # Exact 24-Shot Timeline Boundaries anchored directly to Whisper word timestamps!
-    b01 = 0.0
-    b02 = tc["c02_pov"]
-    b03 = tc["c03_p50"]
-    b04 = tc["c04_eye"]
-    b05 = tc["c05_slash"]
-    b06 = tc["c06_600"] - 0.12
-    b07 = tc["c07_paper"]
-    b08 = tc["c08_chest"]
-    b09 = tc["c09_crumble"] - 0.10
-    b10 = tc["c10_desk"]
-    b11 = tc["c11_100k"] - 0.10
-    b12 = tc["c12_iphone"]
-    b13 = tc["c13_75d"] - 0.10
-    b14 = tc["c14_season"]
-    b15 = tc["c15_glasses"]
-    b16 = tc["c16_shoe"]
-    b17 = tc["c17_dinner"]
-    b18 = tc["c18_envy"]
-    b19 = tc["c19_boulder"]
-    b20 = tc["c20_puppet"] - 0.10
-    b21 = tc["c21_filter"]
-    b22 = tc["c22_free"] - 0.10
-    b23 = tc["c23_cta"]
-    b24 = outro_t0
+    (b01, b02, b03, b04, b05, b06, b07, b08, b09, b10, b11, b12,
+     b13, b14, b15, b16, b17, b18, b19, b20, b21, b22, b23, b24) = _compute_shot_bounds(tc, outro_t0)
 
     chapters = [0.0, b07, b10, b15, b18, b21, b23]
     draw_hud_chrome(cs, cg, txts, fonts, t, total_dur, EP_CODE, EP_TITLE, chapters)
@@ -1130,18 +1142,10 @@ def save_qa_sheets(font_dir: str, meta: dict, qa_dir: str):
     outro_t0 = td - 4.0
 
     # All 24 shots sampled cleanly at the midpoint of each shot!
-    bounds = [
-        0.0, tc["c02_pov"], tc["c03_p50"], tc["c04_eye"], tc["c05_slash"],
-        tc["c06_600"] - 0.12, tc["c07_paper"], tc["c08_chest"], tc["c09_crumble"] - 0.10,
-        tc["c10_desk"], tc["c11_100k"] - 0.10, tc["c12_iphone"], tc["c13_75d"] - 0.10,
-        tc["c14_season"], tc["c15_glasses"], tc["c16_shoe"], tc["c17_dinner"],
-        tc["c18_envy"], tc["c19_boulder"], tc["c20_puppet"] - 0.10,
-        tc["c21_filter"], tc["c22_free"] - 0.10, tc["c23_cta"], outro_t0, td
-    ]
+    bounds = _compute_shot_bounds(tc, outro_t0) + [td]
     ts_24 = [0.5 * (bounds[i] + bounds[i + 1]) for i in range(24)]
-    # Nudge Shot 16 & 17 slightly toward second half so revealed 60h & 20h show up!
-    ts_24[2]  = tc["c03_p60"] + 0.35
-    ts_24[15] = tc["c16_60h"] + 0.35
+    ts_24[2]  = clamp(tc["c03_p60"] + 0.35, bounds[2] + 0.25, bounds[3] - 0.25)
+    ts_24[15] = clamp(tc["c16_60h"] + 0.35, bounds[15] + 0.25, bounds[16] - 0.25)
     ts_24[16] = tc["c17_20h"] + 0.35
 
     pw24, ph24 = 270, 480

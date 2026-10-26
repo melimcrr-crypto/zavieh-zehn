@@ -256,19 +256,35 @@ def align_script_lines(tightened_wav: str, script_lines: list[str], whisper_size
 
     from faster_whisper import WhisperModel
     wm = WhisperModel(whisper_size, device="cpu", compute_type="int8")
-    segs, _ = wm.transcribe(audio_16k, language="fa", word_timestamps=True, vad_filter=False)
-    w_words = [w for s in segs for w in s.words]
+    segs, _ = wm.transcribe(
+        audio_16k,
+        language="fa",
+        word_timestamps=True,
+        vad_filter=False,
+        condition_on_previous_text=False,
+    )
+    w_words = [w for s in segs for w in (s.words or [])]
+
+    # Detect true acoustic speech span from 16kHz waveform as an infallible safety anchor
+    hop16 = 320  # 20ms
+    n_f16 = len(audio_16k) // hop16
+    rms16 = np.sqrt(np.mean(audio_16k[:n_f16 * hop16].reshape(n_f16, hop16) ** 2, axis=1) + 1e-12)
+    voiced_idx = np.where(rms16 > max(float(np.percentile(rms16, 15)) * 2.5, 0.008))[0]
+    acoustic_t0 = float(voiced_idx[0] * 0.02) if len(voiced_idx) else 0.05
+    acoustic_t1 = float((voiced_idx[-1] + 1) * 0.02) if len(voiced_idx) else max(1.0, total_dur - 4.0)
 
     w_chars, w_t0, w_t1 = [], [], []
     for w in w_words:
         nc = _norm_fa(w.word)
         if not nc:
             continue
-        dt = (w.end - w.start) / len(nc)
+        w_s = float(w.start)
+        w_e = max(w_s + 0.04, float(w.end))
+        dt = (w_e - w_s) / len(nc)
         for k, ch in enumerate(nc):
             w_chars.append(ch)
-            w_t0.append(float(w.start + k * dt))
-            w_t1.append(float(w.start + (k + 1) * dt))
+            w_t0.append(w_s + k * dt)
+            w_t1.append(w_s + (k + 1) * dt)
 
     w_str = "".join(w_chars)
     s_chars, line_meta = [], []
@@ -284,49 +300,66 @@ def align_script_lines(tightened_wav: str, script_lines: list[str], whisper_size
         line_meta.append({"full": line.strip(), "tok_spans": tok_spans})
 
     s_str = "".join(s_chars)
-    N_s, N_w = len(s_str), len(w_str)
+    N_s, N_w = max(1, len(s_chars)), len(w_chars)
 
-    sm = difflib.SequenceMatcher(None, s_str, w_str, autojunk=False)
-    anchors_s, anchors_w = [0], [0]
-    for blk in sm.get_matching_blocks():
-        if blk.size > 0:
-            anchors_s.extend([blk.a, blk.a + blk.size - 1])
-            anchors_w.extend([blk.b, blk.b + blk.size - 1])
-    anchors_s.append(max(1, N_s - 1))
-    anchors_w.append(max(1, N_w - 1))
+    t_first = min(acoustic_t0, w_t0[0]) if N_w > 0 else acoustic_t0
+    t_last  = max(acoustic_t1, w_t1[-1]) if N_w > 0 else acoustic_t1
+    avg_spc = max(0.035, (t_last - t_first) / N_s)
 
-    clean_s, clean_w = [], []
-    for a_s, a_w in zip(anchors_s, anchors_w):
-        if not clean_s or (a_s > clean_s[-1] and a_w >= clean_w[-1]):
-            clean_s.append(a_s)
-            clean_w.append(a_w)
+    # Direct continuous time-boundary anchors (eliminates step-function timestamp collapse on Whisper dropouts!)
+    clean_s = [0]
+    clean_t = [round(t_first, 4)]
 
-    mapped_w = np.interp(np.arange(N_s), clean_s, clean_w)
+    if N_w > 0:
+        sm = difflib.SequenceMatcher(None, s_str, w_str, autojunk=False)
+        cand_anchors = []
+        for blk in sm.get_matching_blocks():
+            # Require >= 3-char phonetic match so stray 1-letter matches never warp timeline!
+            if blk.size >= 3:
+                cand_anchors.append((blk.a, w_t0[blk.b]))
+                cand_anchors.append((blk.a + blk.size, w_t1[blk.b + blk.size - 1]))
+
+        for a_s, a_t in cand_anchors:
+            if a_s <= clean_s[-1] or a_s >= N_s:
+                continue
+            ds = a_s - clean_s[-1]
+            dt = a_t - clean_t[-1]
+            rem_s = N_s - a_s
+            rem_t = t_last - a_t
+            # Enforce realistic human speaking rate bounds across both current step & remaining script
+            if dt >= ds * 0.018 and dt <= ds * (avg_spc * 3.6 + 0.85) and rem_t >= rem_s * 0.018:
+                clean_s.append(int(a_s))
+                clean_t.append(float(a_t))
+
+    clean_s.append(int(N_s))
+    clean_t.append(float(max(clean_t[-1] + 0.08, t_last)))
+
+    # Smooth continuous timestamp at every character boundary 0 .. N_s!
+    char_t = np.interp(np.arange(N_s + 1, dtype=np.float64), clean_s, clean_t)
 
     aligned_lines = []
     for lm in line_meta:
         tokens, t_starts, t_ends = [], [], []
         for tk, c0, c1 in lm["tok_spans"]:
-            wi0 = int(np.clip(round(mapped_w[c0]), 0, N_w - 1))
-            wi1 = int(np.clip(round(mapped_w[max(c0, c1 - 1)]), 0, N_w - 1))
-            t0_v = round(w_t0[wi0], 3)
-            t1_v = round(max(t0_v + 0.06, w_t1[wi1]), 3)
+            t0_v = round(float(char_t[c0]), 3)
+            t1_v = round(max(t0_v + 0.06, float(char_t[c1])), 3)
             tokens.append(tk)
             t_starts.append(t0_v)
             t_ends.append(t1_v)
-        # Ensure strictly monotonic token windows for ultra-smooth wipe interpolation
         for k in range(1, len(t_starts)):
             if t_starts[k] < t_ends[k-1]:
                 mid = 0.5 * (t_starts[k] + t_ends[k-1])
                 t_ends[k-1] = round(mid, 3)
                 t_starts[k] = round(mid, 3)
             if t_ends[k] <= t_starts[k]:
-                t_ends[k] = round(t_starts[k] + 0.08, 3)
+                t_ends[k] = round(t_starts[k] + 0.06, 3)
 
+        l_start = round(max(0.0, t_starts[0] - 0.08), 3)
+        l_end   = round(max(l_start + 0.35, t_ends[-1] + 0.18), 3)
         aligned_lines.append({
             "full": lm["full"],
-            "start": round(max(0.0, t_starts[0] - 0.10), 3),
-            "end": round(t_ends[-1] + 0.22, 3),
+            "start": l_start,
+            "end": l_end,
             "tokens": tokens,
             "times": t_starts,
             "ends": t_ends,
@@ -335,8 +368,8 @@ def align_script_lines(tightened_wav: str, script_lines: list[str], whisper_size
     for i in range(len(aligned_lines) - 1):
         if aligned_lines[i]["end"] > aligned_lines[i+1]["start"]:
             mid = round(0.5 * (aligned_lines[i]["end"] + aligned_lines[i+1]["start"]), 3)
-            aligned_lines[i]["end"] = round(mid - 0.015, 3)
-            aligned_lines[i+1]["start"] = round(mid + 0.015, 3)
+            aligned_lines[i]["end"] = round(max(aligned_lines[i]["start"] + 0.18, mid - 0.012), 3)
+            aligned_lines[i+1]["start"] = round(min(aligned_lines[i+1]["end"] - 0.18, mid + 0.012), 3)
 
     speech_span = max(0.1, w_words[-1].end - w_words[0].start)
     net_wpm = len(w_words) / (speech_span / 60.0)
