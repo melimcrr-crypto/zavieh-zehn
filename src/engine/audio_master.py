@@ -541,90 +541,249 @@ def build_master_stereo_mix(tightened_wav: str, out_master_wav: str, sfx_events:
             continue
 
         if kind == "ping":
-            dn = min(int(0.20 * SR), N - idx)
+            dn = min(int(0.24 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
             f0 = float(ev.get("freq", 1174.66))
             pan = float(ev.get("pan", 0.5))
-            sig = (np.sin(2 * np.pi * f0 * tt) * np.exp(-tt * 24.0)
-                   + 0.35 * np.sin(2 * np.pi * (f0 * 0.5) * tt) * np.exp(-tt * 16.0)) * 0.036
+            sig = (np.sin(2 * np.pi * f0 * tt) * np.exp(-tt * 20.0)
+                   + 0.45 * np.sin(2 * np.pi * (f0 * 0.5) * tt) * np.exp(-tt * 14.0)
+                   + 0.25 * np.sin(2 * np.pi * (f0 * 2.0) * tt) * np.exp(-tt * 35.0)) * 0.115
             sfx_L[idx:idx+dn] += sig * (1.0 - 0.5 * pan)
             sfx_R[idx:idx+dn] += sig * (0.5 + 0.5 * pan)
 
+        elif kind == "whip":
+            # Fast high-energy camera whip-pan cut (stereo L->R or R->L air rush + low thump!)
+            dn = min(int(0.26 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            u_w = tt / max(0.01, dn / SR)
+            noise = rng_s.standard_normal(dn).astype(np.float32)
+            band = lfilter(*butter(2, [260.0/(SR/2), 2600.0/(SR/2)], btype="band"), noise)
+            env_w = np.sin(np.pi * u_w) ** 1.5
+            thump = np.sin(2 * np.pi * (145.0 - 75.0 * u_w) * tt) * np.exp(-tt * 26.0) * 0.65
+            sig = (band * env_w + thump) * 0.145
+            dir_lr = (idx % 2 == 0)
+            pan_curve = u_w if dir_lr else (1.0 - u_w)
+            sfx_L[idx:idx+dn] += sig * (1.15 - 0.75 * pan_curve)
+            sfx_R[idx:idx+dn] += sig * (0.40 + 0.75 * pan_curve)
+
         elif kind == "whoosh":
-            dn = min(int(0.48 * SR), N - idx)
+            dn = min(int(0.44 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            u_w = tt / max(0.01, dn / SR)
+            noise = rng_s.standard_normal(dn).astype(np.float32)
+            shaped = lfilter(*butter(2, [190.0/(SR/2), 1450.0/(SR/2)], btype="band"), noise)
+            env_w = np.sin(np.pi * u_w) ** 1.7
+            low_air = np.sin(2 * np.pi * (110.0 - 40.0 * u_w) * tt) * env_w * 0.45
+            sig = (shaped * env_w + low_air) * 0.115
+            sfx_L[idx:idx+dn] += sig * (1.1 - 0.4 * u_w)
+            sfx_R[idx:idx+dn] += sig * (0.7 + 0.4 * u_w)
+
+        elif kind == "impact_boom":
+            # Deep cinema trailer sub-drop + chest punch + crisp transient crack!
+            dn = min(int(0.68 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            sub_d = np.sin(2 * np.pi * (92.0 * np.exp(-tt * 3.8) + 34.0) * tt) * np.exp(-tt * 4.8)
+            harm_d = 0.52 * np.sin(2 * np.pi * 2.0 * (92.0 * np.exp(-tt * 3.8) + 34.0) * tt) * np.exp(-tt * 6.5)
+            crack_n = rng_s.standard_normal(dn).astype(np.float32)
+            crack = lfilter(*butter(2, [500.0/(SR/2), 3200.0/(SR/2)], btype="band"), crack_n) * np.exp(-tt * 42.0) * 0.45
+            sig = (sub_d + harm_d + crack) * 0.235
+            sfx_L[idx:idx+dn] += sig * 1.02
+            sfx_R[idx:idx+dn] += sig * 0.98
+
+        elif kind == "riser":
+            # 0.72s dramatic tension riser leading right into a reveal cut!
+            dn = min(int(0.72 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            u_r = tt / max(0.01, dn / SR)
+            noise = rng_s.standard_normal(dn).astype(np.float32)
+            air = lfilter(*butter(2, [350.0/(SR/2), 3400.0/(SR/2)], btype="band"), noise)
+            tone_r = np.sin(2 * np.pi * (220.0 + 520.0 * (u_r ** 2)) * tt)
+            env_r = (u_r ** 2.3) * np.clip((1.0 - u_r) * 18.0, 0.0, 1.0)
+            sig = (0.65 * air + 0.55 * tone_r) * env_r * 0.135
+            sfx_L[idx:idx+dn] += sig * (0.75 + 0.35 * u_r)
+            sfx_R[idx:idx+dn] += sig * (1.10 - 0.25 * u_r)
+
+        elif kind == "screen_on":
+            # Capacitive glass wake tap + warm OLED harmonic hum
+            dn = min(int(0.32 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            tap = np.sin(2 * np.pi * 2350.0 * tt) * np.exp(-tt * 170.0) * 0.75
+            hum = (np.sin(2 * np.pi * 440.0 * tt) + 0.5 * np.sin(2 * np.pi * 880.0 * tt)
+                   + 0.25 * np.sin(2 * np.pi * 1320.0 * tt)) * np.clip(tt / 0.02, 0, 1) * np.exp(-tt * 11.5) * 0.55
+            sig = (tap + hum) * 0.135
+            sfx_L[idx:idx+dn] += sig * 0.95
+            sfx_R[idx:idx+dn] += sig * 1.05
+
+        elif kind == "swipe":
+            # Thumb screen-swipe friction + crisp haptic UI pop
+            dn = min(int(0.14 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            u_s = tt / max(0.01, dn / SR)
+            noise = rng_s.standard_normal(dn).astype(np.float32)
+            fric = lfilter(*butter(2, [1100.0/(SR/2), 4200.0/(SR/2)], btype="band"), noise) * np.sin(np.pi * u_s)
+            hap = np.sin(2 * np.pi * 240.0 * tt) * np.exp(-tt * 85.0) * 0.85
+            sig = (0.65 * fric + hap) * 0.140
+            sfx_L[idx:idx+dn] += sig * 0.92
+            sfx_R[idx:idx+dn] += sig * 1.08
+
+        elif kind == "cash_slam":
+            # Heavy price tag / metallic register slam
+            dn = min(int(0.28 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            thud = np.sin(2 * np.pi * 142.0 * tt) * np.exp(-tt * 32.0)
+            bell = (np.sin(2 * np.pi * 2093.0 * tt) * np.exp(-tt * 22.0)
+                    + 0.65 * np.sin(2 * np.pi * 2637.0 * tt) * np.exp(-tt * 26.0)) * 0.55
+            sig = (thud + bell) * 0.155
+            sfx_L[idx:idx+dn] += sig * 1.04
+            sfx_R[idx:idx+dn] += sig * 0.96
+
+        elif kind == "slash":
+            # Crisp metallic blade slash crossing out illusionary price!
+            dn = min(int(0.19 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
             noise = rng_s.standard_normal(dn).astype(np.float32)
-            shaped = lfilter(*butter(2, [190.0/(SR/2), 1050.0/(SR/2)], btype="band"), noise)
-            env_w = np.sin(np.pi * tt / (dn / SR)) ** 1.8
-            sig = shaped * env_w * 0.036
-            sfx_L[idx:idx+dn] += sig * 0.88
-            sfx_R[idx:idx+dn] += sig * 1.12
+            hiss = lfilter(*butter(2, [1800.0/(SR/2), 5800.0/(SR/2)], btype="band"), noise) * np.exp(-tt * 24.0)
+            ring_s = np.sin(2 * np.pi * (3400.0 - 9500.0 * tt) * tt) * np.exp(-tt * 32.0)
+            sig = (0.75 * hiss + 0.55 * ring_s) * 0.150
+            sfx_L[idx:idx+dn] += sig * 1.12
+            sfx_R[idx:idx+dn] += sig * 0.88
 
         elif kind == "click" or kind == "tick":
-            dn = min(int(0.055 * SR), N - idx)
+            dn = min(int(0.065 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
-            sig = (np.sin(2 * np.pi * 1920.0 * tt) * np.exp(-tt * 155.0)
-                   + 0.55 * np.sin(2 * np.pi * 640.0 * tt) * np.exp(-tt * 95.0)) * 0.048
+            sig = (np.sin(2 * np.pi * 1980.0 * tt) * np.exp(-tt * 145.0)
+                   + 0.65 * np.sin(2 * np.pi * 660.0 * tt) * np.exp(-tt * 90.0)) * 0.130
             sfx_L[idx:idx+dn] += sig
             sfx_R[idx:idx+dn] += sig
 
         elif kind == "heartbeat":
-            dn = min(int(0.48 * SR), N - idx)
+            dn = min(int(0.52 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
-            lub = np.sin(2 * np.pi * (68.0 - 26.0 * tt) * tt) * np.exp(-tt * 13.0)
-            dub_t = np.maximum(0.0, tt - 0.19)
-            dub = (tt >= 0.19).astype(np.float32) * np.sin(2 * np.pi * (56.0 - 20.0 * dub_t) * dub_t) * np.exp(-dub_t * 15.0) * 0.72
-            sig = (lub + dub) * 0.068
+            lub_f = 74.0 - 28.0 * tt
+            lub = (np.sin(2 * np.pi * lub_f * tt) + 0.48 * np.sin(2 * np.pi * 2.0 * lub_f * tt)) * np.exp(-tt * 12.5)
+            dub_t = np.maximum(0.0, tt - 0.20)
+            dub_f = 60.0 - 22.0 * dub_t
+            dub = (tt >= 0.20).astype(np.float32) * (
+                np.sin(2 * np.pi * dub_f * dub_t) + 0.45 * np.sin(2 * np.pi * 2.0 * dub_f * dub_t)
+            ) * np.exp(-dub_t * 14.5) * 0.78
+            sig = (lub + dub) * 0.195
             sfx_L[idx:idx+dn] += sig
             sfx_R[idx:idx+dn] += sig
 
+        elif kind == "crumble":
+            # Stone life-pedestal cracking & tumbling into abyss!
+            dn = min(int(0.55 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            noise = rng_s.standard_normal(dn).astype(np.float32)
+            crack1 = lfilter(*butter(2, [600.0/(SR/2), 3600.0/(SR/2)], btype="band"), noise) * np.exp(-tt * 28.0)
+            rumble = lfilter(*butter(2, [55.0/(SR/2), 260.0/(SR/2)], btype="band"), noise) * np.exp(-tt * 5.5) * 1.4
+            sub_c = np.sin(2 * np.pi * (82.0 - 35.0 * tt) * tt) * np.exp(-tt * 7.5)
+            sig = (0.65 * crack1 + 0.85 * rumble + 0.75 * sub_c) * 0.175
+            sfx_L[idx:idx+dn] += sig * 1.06
+            sfx_R[idx:idx+dn] += sig * 0.94
+
+        elif kind == "typing":
+            # Rapid 7-stroke mechanical keyboard burst + fast clockwork whir
+            for k_i, k_dt in enumerate((0.00, 0.07, 0.13, 0.21, 0.27, 0.35, 0.42)):
+                ki = idx + int(k_dt * SR)
+                if ki < N - 1200:
+                    kd = min(int(0.045 * SR), N - ki)
+                    kt = np.arange(kd, dtype=np.float32) / SR
+                    kf = 1650.0 + (k_i % 3) * 340.0
+                    ksig = (np.sin(2 * np.pi * kf * kt) * np.exp(-kt * 165.0)
+                            + 0.6 * np.sin(2 * np.pi * 420.0 * kt) * np.exp(-kt * 110.0)) * 0.115
+                    sfx_L[ki:ki+kd] += ksig * (0.85 if k_i % 2 == 0 else 1.15)
+                    sfx_R[ki:ki+kd] += ksig * (1.15 if k_i % 2 == 0 else 0.85)
+
+        elif kind == "domino_burst":
+            # 14 accelerating horology ticks rising in pitch as 75-day calendar ignites!
+            for d_i in range(14):
+                ki = idx + int((d_i * 0.072) * SR)
+                if ki < N - 1200:
+                    kd = min(int(0.05 * SR), N - ki)
+                    kt = np.arange(kd, dtype=np.float32) / SR
+                    df = 920.0 + d_i * 88.0
+                    dsig = (np.sin(2 * np.pi * df * kt) * np.exp(-kt * 140.0)
+                            + 0.4 * np.sin(2 * np.pi * (df * 2.0) * kt) * np.exp(-kt * 180.0)) * 0.110
+                    pan_d = d_i / 13.0
+                    sfx_L[ki:ki+kd] += dsig * (1.15 - 0.6 * pan_d)
+                    sfx_R[ki:ki+kd] += dsig * (0.55 + 0.6 * pan_d)
+
+        elif kind == "bell_ding":
+            # Shimmering restaurant silver cloche bell!
+            dn = min(int(0.65 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            sig = (np.sin(2 * np.pi * 1760.0 * tt) * np.exp(-tt * 7.5)
+                   + 0.48 * np.sin(2 * np.pi * 3520.0 * tt) * np.exp(-tt * 12.0)
+                   + 0.25 * np.sin(2 * np.pi * 5180.0 * tt) * np.exp(-tt * 19.0)) * 0.115
+            sfx_L[idx:idx+dn] += sig * 0.92
+            sfx_R[idx:idx+dn] += sig * 1.08
+
+        elif kind == "chain_clink":
+            # Heavy cold-steel shackle clink (double transient)
+            for c_off, g_c in ((0.0, 1.0), (0.075, 0.72)):
+                ci = idx + int(c_off * SR)
+                if ci < N - 2000:
+                    cd = min(int(0.18 * SR), N - ci)
+                    ct = np.arange(cd, dtype=np.float32) / SR
+                    csig = (np.sin(2 * np.pi * 1480.0 * ct) * np.exp(-ct * 38.0)
+                            + 0.65 * np.sin(2 * np.pi * 2390.0 * ct) * np.exp(-ct * 46.0)
+                            + 0.45 * np.sin(2 * np.pi * 3810.0 * ct) * np.exp(-ct * 60.0)) * 0.125 * g_c
+                    sfx_L[ci:ci+cd] += csig * 1.08
+                    sfx_R[ci:ci+cd] += csig * 0.92
+
         elif kind == "scan":
-            dn = min(int(0.38 * SR), N - idx)
+            dn = min(int(0.42 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
             env_sc = np.sin(np.pi * tt / (dn / SR)) ** 1.4
-            sweep = np.sin(2 * np.pi * (340.0 + 480.0 * tt) * tt) * env_sc * 0.026
+            sweep = (np.sin(2 * np.pi * (360.0 + 620.0 * tt) * tt)
+                     + 0.35 * np.sin(2 * np.pi * (720.0 + 1240.0 * tt) * tt)) * env_sc * 0.095
             sfx_L[idx:idx+dn] += sweep * 0.80
             sfx_R[idx:idx+dn] += sweep * 1.20
 
         elif kind == "shatter":
-            dn = min(int(0.34 * SR), N - idx)
+            # Dramatic chain & glass liberation burst with sparkling stereo shards!
+            dn = min(int(0.50 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
             noise = rng_s.standard_normal(dn).astype(np.float32)
-            glass = lfilter(*butter(2, [1400.0/(SR/2), 4600.0/(SR/2)], btype="band"), noise) * np.exp(-tt * 18.0)
-            impact = np.sin(2 * np.pi * 125.0 * tt) * np.exp(-tt * 28.0)
-            sig = (0.55 * glass + 0.65 * impact) * 0.052
-            sfx_L[idx:idx+dn] += sig * 1.05
-            sfx_R[idx:idx+dn] += sig * 0.95
+            glass = lfilter(*butter(2, [1500.0/(SR/2), 5400.0/(SR/2)], btype="band"), noise) * np.exp(-tt * 14.0)
+            impact = np.sin(2 * np.pi * (135.0 - 45.0 * tt) * tt) * np.exp(-tt * 18.0)
+            sparkles = (np.sin(2 * np.pi * 2960.0 * tt) * np.exp(-tt * 22.0)
+                        + np.sin(2 * np.pi * 4186.0 * tt) * np.exp(-tt * 28.0)) * 0.35
+            sig = (0.65 * glass + 0.80 * impact + sparkles) * 0.185
+            sfx_L[idx:idx+dn] += sig * 1.08
+            sfx_R[idx:idx+dn] += sig * 0.92
 
         elif kind == "stamp":
-            dn = min(int(0.16 * SR), N - idx)
+            dn = min(int(0.20 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
-            sig = (np.sin(2 * np.pi * 128.0 * tt) * np.exp(-tt * 34.0)
-                   + 0.42 * np.sin(2 * np.pi * 1680.0 * tt) * np.exp(-tt * 135.0)) * 0.056
+            sig = (np.sin(2 * np.pi * 125.0 * tt) * np.exp(-tt * 28.0)
+                   + 0.50 * np.sin(2 * np.pi * 250.0 * tt) * np.exp(-tt * 38.0)
+                   + 0.45 * np.sin(2 * np.pi * 1720.0 * tt) * np.exp(-tt * 125.0)) * 0.165
             sfx_L[idx:idx+dn] += sig
             sfx_R[idx:idx+dn] += sig
 
         elif kind == "sub_swell":
-            dn = min(int(1.15 * SR), N - idx)
+            dn = min(int(1.20 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
             env_s = np.sin(np.pi * tt / (dn / SR)) ** 1.5
-            sig = (np.sin(2 * np.pi * (58.0 - 12.0 * tt) * tt)
-                   + 0.30 * np.sin(2 * np.pi * 2.0 * (58.0 - 12.0 * tt) * tt)) * env_s * 0.068
+            sig = (np.sin(2 * np.pi * (60.0 - 14.0 * tt) * tt)
+                   + 0.38 * np.sin(2 * np.pi * 2.0 * (60.0 - 14.0 * tt) * tt)) * env_s * 0.145
             sfx_L[idx:idx+dn] += sig
             sfx_R[idx:idx+dn] += sig
 
         elif kind == "chime":
-            dn = min(int(2.6 * SR), N - idx)
+            dn = min(int(2.8 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR
             f0 = float(ev.get("freq", 587.33))
             att = np.clip(tt / 0.012, 0, 1)
             sig = att * (
-                np.sin(2 * np.pi * f0 * tt) * np.exp(-tt * 2.3)
-                + 0.44 * np.sin(2 * np.pi * f0 * 1.5 * tt) * np.exp(-tt * 3.2)
-                + 0.24 * np.sin(2 * np.pi * f0 * 2.0 * tt) * np.exp(-tt * 4.4)
-            ) * 0.058
-            sfx_L[idx:idx+dn] += sig * 0.94
-            sfx_R[idx:idx+dn] += sig * 1.06
+                np.sin(2 * np.pi * f0 * tt) * np.exp(-tt * 2.1)
+                + 0.46 * np.sin(2 * np.pi * f0 * 1.5 * tt) * np.exp(-tt * 3.0)
+                + 0.26 * np.sin(2 * np.pi * f0 * 2.0 * tt) * np.exp(-tt * 4.2)
+            ) * 0.115
+            sfx_L[idx:idx+dn] += sig * 0.92
+            sfx_R[idx:idx+dn] += sig * 1.08
 
     mix_L = np.clip(vo + mus_L + sfx_L, -0.97, 0.97)
     mix_R = np.clip(vo + mus_R + sfx_R, -0.97, 0.97)
@@ -668,11 +827,18 @@ def build_episode_audio(
 
     t_cues = {}
     sfx_events = []
-    for cue_name, seg_idx, word_idx, sfx_kind in sfx_cue_map:
+    for item in sfx_cue_map:
+        if len(item) == 5:
+            cue_name, seg_idx, word_idx, sfx_kind, t_off = item
+        else:
+            cue_name, seg_idx, word_idx, sfx_kind = item
+            t_off = -0.03
         tms = sub_lines[seg_idx]["times"]
         ts = float(tms[min(word_idx, len(tms) - 1)])
-        t_cues[cue_name] = round(ts, 3)
-        sfx_events.append({"type": sfx_kind, "t": max(0.0, ts - 0.03)})
+        if cue_name:
+            t_cues[cue_name] = round(ts, 3)
+        if sfx_kind and sfx_kind != "none":
+            sfx_events.append({"type": sfx_kind, "t": max(0.0, ts + float(t_off))})
 
     # Signature crystalline D5 tonic chime on endplate reveal
     sfx_events.append({"type": "chime", "t": max(0.5, total_dur - tail_pad_sec + 0.12), "freq": 587.33})

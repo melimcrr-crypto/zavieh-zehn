@@ -914,6 +914,273 @@ def draw_ecg_waveform(cs, cg, x0: float, x1: float, y_mid: float, t: float, amp:
     cs.restore(); cg.restore()
 
 
+# =============================================================================
+# STUDIO v4.0 EXPRESSIVE HUMAN CHARACTER RIG & @ensan.besham HYPER-CUT PRIMITIVES
+# =============================================================================
+
+def draw_character_with_phone(
+    cs, cg, cx: float, foot_y: float, scale: float = 1.0,
+    raise_p: float = 1.0, screen_glow: float = 1.0,
+    t: float = 0.0, alpha: float = 1.0, draw_p: float = 1.0,
+    star_mind: bool = False, facing_right: bool = True
+):
+    """
+    Signature @ensan.besham human protagonist holding their smartphone in hand!
+    - Smoothly raises forearm + phone from side (raise_p=0) up to face level (raise_p=1)
+    - Casts translucent volumetric screen light cone directly onto face!
+    - Returns (phone_x, phone_y, chest_x, chest_y) in world coordinates.
+    """
+    if alpha <= 0.01 or draw_p <= 0.01:
+        return (cx, foot_y - 100 * scale, cx, foot_y - 95 * scale)
+
+    rp = clamp(raise_p)
+    dp = clamp(draw_p)
+    sgn = 1.0 if facing_right else -1.0
+    breathe = math.sin(t * 2.4) * 1.8
+
+    # Head tilts gently toward the raised phone
+    hx_loc = sgn * (7.0 * rp)
+    hy_loc = -148.0 + 5.0 * rp + breathe * 0.5
+
+    # Shoulder -> Elbow -> Hand holding phone kinematics
+    sh_x, sh_y = sgn * 24.0, -110.0 + breathe * 0.4
+    el_x = sh_x + sgn * (12.0 + 14.0 * rp)
+    el_y = sh_y + 34.0 * (1.0 - 0.35 * rp)
+    hd_x = el_x + sgn * (-4.0 + 26.0 * rp)
+    hd_y = el_y + (26.0 * (1.0 - rp) - 38.0 * rp)
+
+    ph_loc_x = hd_x + sgn * 7.0
+    ph_loc_y = hd_y - 12.0
+
+    # Volumetric phone screen glow cone onto character's face!
+    if screen_glow > 0.03 and rp > 0.25:
+        ga = clamp(screen_glow) * clamp((rp - 0.2) / 0.8) * alpha
+        cs.save()
+        cs.translate(cx, foot_y)
+        cs.scale(scale, scale)
+        cs.set_dash([])
+        p_grad = cairo.LinearGradient(ph_loc_x, ph_loc_y, hx_loc, hy_loc)
+        p_grad.add_color_stop_rgba(0.0, 1, 1, 1, 0.36 * ga)
+        p_grad.add_color_stop_rgba(0.7, 1, 1, 1, 0.10 * ga)
+        p_grad.add_color_stop_rgba(1.0, 1, 1, 1, 0.00)
+        cs.move_to(ph_loc_x - sgn * 3, ph_loc_y - 13)
+        cs.line_to(hx_loc - sgn * 4, hy_loc - 25)
+        cs.line_to(hx_loc + sgn * 16, hy_loc + 20)
+        cs.line_to(ph_loc_x - sgn * 3, ph_loc_y + 13)
+        cs.close_path()
+        cs.set_source(p_grad)
+        cs.fill()
+        cs.restore()
+
+    for ctx, lw, al in ((cs, 2.5, alpha * 0.96), (cg, 5.2, alpha * 0.38)):
+        ctx.save()
+        ctx.translate(cx, foot_y)
+        ctx.scale(scale, scale)
+        ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+        ctx.set_line_join(cairo.LINE_JOIN_ROUND)
+        ctx.set_source_rgba(1, 1, 1, al)
+        ctx.set_line_width(lw / max(0.35, scale))
+
+        # Head
+        set_stroke_draw(ctx, dp, 160.0)
+        ctx.arc(hx_loc, hy_loc, 22.0, 0, 2 * math.pi)
+        ctx.stroke()
+
+        # Architectural torso + passive arm + legs
+        set_stroke_draw(ctx, dp, 480.0)
+        ctx.move_to(-sgn * 18, -118 + breathe * 0.4)
+        ctx.curve_to(-sgn * 36, -118, -sgn * 40, -104, -sgn * 40, -86)
+        ctx.line_to(-sgn * 40, -46)
+        ctx.line_to(-sgn * 28, -46)
+        ctx.line_to(-sgn * 28, -84)
+        ctx.move_to(-24, -84)
+        ctx.line_to(-24, 0); ctx.line_to(-6, 0); ctx.line_to(-6, -52)
+        ctx.line_to(6, -52); ctx.line_to(6, 0); ctx.line_to(24, 0)
+        ctx.line_to(24, -84)
+        ctx.move_to(sgn * 18, -118 + breathe * 0.4)
+        ctx.line_to(-sgn * 18, -118 + breathe * 0.4)
+        ctx.stroke()
+
+        # Articulated active arm holding smartphone!
+        ctx.set_dash([])
+        ctx.set_line_width((lw + 0.6) / max(0.35, scale))
+        ctx.move_to(sh_x, sh_y)
+        ctx.line_to(el_x, el_y)
+        ctx.line_to(hd_x, hd_y)
+        ctx.stroke()
+
+        # Smartphone in hand (tilted slightly toward face)
+        ctx.save()
+        ctx.translate(ph_loc_x, ph_loc_y)
+        ctx.rotate(-sgn * 0.24 * rp)
+        rounded_rect_path(ctx, -9, -18, 18, 36, 4)
+        if ctx is cs:
+            ctx.set_source_rgba(1, 1, 1, (0.15 + 0.70 * screen_glow * rp) * alpha)
+            ctx.fill_preserve()
+        ctx.set_source_rgba(1, 1, 1, min(1.0, al * 1.15))
+        ctx.set_line_width(lw / max(0.35, scale))
+        ctx.stroke()
+        ctx.restore()
+
+        if star_mind:
+            draw_star4(ctx, hx_loc, hy_loc, 11.0, al)
+        ctx.restore()
+
+    world_ph_x = cx + ph_loc_x * scale
+    world_ph_y = foot_y + ph_loc_y * scale
+    world_ch_x = cx
+    world_ch_y = foot_y - 92.0 * scale
+    return (world_ph_x, world_ph_y, world_ch_x, world_ch_y)
+
+
+def draw_pov_phone_in_hand(
+    cs, cg, cx: float, cy: float, w: float = 330.0, h: float = 610.0,
+    thumb_swipe: float = 0.0, thumb_tap: float = 0.0,
+    alpha: float = 1.0, draw_p: float = 1.0, bright_screen: bool = False
+):
+    """
+    Exact @ensan.besham v04_11M POV Close-Up:
+    Large smartphone gripped by anatomical monoline fingers (left bezel) + palm & articulated thumb (right side)!
+    """
+    if alpha <= 0.01 or draw_p <= 0.01:
+        return
+    dp = clamp(draw_p)
+    x0, y0 = cx - w / 2.0, cy - h / 2.0
+    rad = 42.0
+
+    # Screen fill (dark obsidian or @ensan.besham lit white glass!)
+    cs.save(); cs.set_dash([])
+    rounded_rect_path(cs, x0, y0, w, h, rad)
+    if bright_screen:
+        cs.set_source_rgba(0.92, 0.92, 0.95, 0.94 * alpha * dp)
+    else:
+        cs.set_source_rgba(0.035, 0.035, 0.05, 0.95 * alpha * dp)
+    cs.fill()
+    cs.restore()
+
+    # Phone chassis & speaker island
+    for ctx, lw, al in ((cs, 3.2, alpha * 0.98), (cg, 6.8, alpha * 0.52)):
+        ctx.save()
+        set_stroke_draw(ctx, dp, 2.2 * (w + h))
+        rounded_rect_path(ctx, x0, y0, w, h, rad)
+        ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw); ctx.stroke()
+        rounded_rect_path(ctx, cx - 46, y0 + 22, 92, 14, 7)
+        ctx.set_source_rgba(0.1, 0.1, 0.12, al) if bright_screen else ctx.set_source_rgba(1, 1, 1, al * 0.75)
+        ctx.set_line_width(2.0); ctx.stroke()
+        ctx.restore()
+
+    if dp > 0.35:
+        # 4 curved fingers gripping left edge of phone
+        for ctx, lw, al in ((cs, 2.6, alpha * 0.92), (cg, 5.0, alpha * 0.32)):
+            ctx.save(); ctx.set_dash([])
+            for fi in range(4):
+                fy = cy - 35.0 + fi * 48.0
+                rounded_rect_path(ctx, x0 - 22, fy, 30, 34, 14)
+                if ctx is cs:
+                    ctx.set_source_rgba(0.03, 0.03, 0.04, 0.96 * alpha); ctx.fill_preserve()
+                ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw); ctx.stroke()
+
+            # Right-side palm arch + wrist silhouette + articulated swiping thumb!
+            sw_dy = -58.0 * math.sin(math.pi * clamp(thumb_swipe))
+            press_dx = -8.0 * math.sin(math.pi * clamp(thumb_tap * 2.0)) if 0.0 < thumb_tap < 0.5 else 0.0
+            th_tip_x = x0 + w - 88.0 + press_dx
+            th_tip_y = cy + 72.0 + sw_dy
+
+            ctx.new_path()
+            ctx.move_to(x0 + w - 25, y0 + h + 95)
+            ctx.curve_to(x0 + w + 52, y0 + h + 25, x0 + w + 58, cy + 120, x0 + w + 26, cy + 45)
+            ctx.curve_to(x0 + w + 4, cy + 12, th_tip_x + 34, th_tip_y - 26, th_tip_x, th_tip_y - 16)
+            ctx.curve_to(th_tip_x - 22, th_tip_y - 8, th_tip_x - 18, th_tip_y + 24, th_tip_x + 12, th_tip_y + 28)
+            ctx.curve_to(x0 + w - 20, th_tip_y + 42, x0 + w - 8, y0 + h - 30, x0 + w - 85, y0 + h + 95)
+            if ctx is cs:
+                ctx.set_source_rgba(0.03, 0.03, 0.04, 0.96 * alpha); ctx.fill_preserve()
+            ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw); ctx.stroke()
+            ctx.restore()
+
+            if 0.02 < thumb_tap < 0.98 and ctx is cs:
+                rr = 14.0 + ease_out_cubic(thumb_tap) * 58.0
+                cs.arc(th_tip_x - 6, th_tip_y + 4, rr, 0, 2 * math.pi)
+                cs.set_source_rgba(1, 1, 1, (1.0 - thumb_tap) * 0.85 * alpha)
+                cs.set_line_width(2.0); cs.stroke()
+
+
+def draw_character_at_desk(cs, cg, cx: float, ground_y: float, scale: float = 1.0, t: float = 0.0, alpha: float = 1.0):
+    """60fps hunched office worker typing rapidly at glowing laptop desk."""
+    if alpha <= 0.01:
+        return
+    typ = math.sin(t * 24.0) * 4.5
+    # Laptop upward screen glow onto worker's face
+    cs.save()
+    cs.translate(cx, ground_y); cs.scale(scale, scale); cs.set_dash([])
+    lg = cairo.LinearGradient(-48, -96, 22, -162)
+    lg.add_color_stop_rgba(0.0, 1, 1, 1, 0.30 * alpha)
+    lg.add_color_stop_rgba(1.0, 1, 1, 1, 0.0)
+    cs.move_to(-65, -92); cs.line_to(10, -172); cs.line_to(38, -132); cs.line_to(-32, -92)
+    cs.close_path(); cs.set_source(lg); cs.fill()
+    cs.restore()
+
+    for ctx, lw, al in ((cs, 2.5, alpha * 0.94), (cg, 5.0, alpha * 0.36)):
+        ctx.save()
+        ctx.translate(cx, ground_y); ctx.scale(scale, scale)
+        ctx.set_dash([])
+        ctx.set_line_cap(cairo.LINE_CAP_ROUND); ctx.set_line_join(cairo.LINE_JOIN_ROUND)
+        ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw / max(0.4, scale))
+
+        # Ground + Desk table
+        ctx.move_to(-185, 0); ctx.line_to(185, 0); ctx.stroke()
+        ctx.move_to(-135, -88); ctx.line_to(15, -88); ctx.stroke()
+        ctx.move_to(-120, -88); ctx.line_to(-120, 0); ctx.move_to(0, -88); ctx.line_to(0, 0); ctx.stroke()
+
+        # Open glowing laptop on desk
+        ctx.move_to(-92, -88); ctx.line_to(-32, -88); ctx.stroke()
+        ctx.move_to(-92, -88); ctx.line_to(-108, -138); ctx.stroke()
+
+        # Office chair
+        ctx.move_to(42, -55); ctx.line_to(96, -55); ctx.line_to(106, -125); ctx.stroke()
+        ctx.move_to(68, -55); ctx.line_to(68, 0); ctx.move_to(48, 0); ctx.line_to(88, 0); ctx.stroke()
+
+        # Seated hunched human body + fast typing arms
+        ctx.arc(24, -152, 20, 0, 2 * math.pi); ctx.stroke()
+        ctx.move_to(34, -130); ctx.curve_to(56, -108, 66, -82, 62, -58) # curved back
+        ctx.line_to(22, -56); ctx.line_to(18, 0); ctx.stroke()
+        # Two typing forearms
+        ctx.move_to(38, -120); ctx.line_to(-2, -98); ctx.line_to(-42, -94 + typ); ctx.stroke()
+        ctx.move_to(34, -116); ctx.line_to(-8, -94); ctx.line_to(-52, -92 - typ); ctx.stroke()
+        ctx.restore()
+
+
+def draw_observatory_eye(
+    cs, cg, cx: float, cy: float, radius: float = 46.0, t: float = 0.0,
+    alpha: float = 1.0, scan_targets: list = None
+):
+    """Exact @ensan.besham top AI Observatory Eye + optional geometric scan rays."""
+    if alpha <= 0.01:
+        return
+    cs.save(); cg.save(); cs.set_dash([]); cg.set_dash([])
+    # Outer counter-rotating dotted halo
+    for k in range(24):
+        ang = k * (math.pi / 12.0) + t * 0.65
+        cs.arc(cx + math.cos(ang) * radius, cy + math.sin(ang) * radius, 1.7, 0, 2 * math.pi)
+        cs.set_source_rgba(1, 1, 1, 0.55 * alpha); cs.fill()
+    # Inner solid iris + glowing pupil
+    cs.arc(cx, cy, radius * 0.66, 0, 2 * math.pi)
+    cs.set_source_rgba(1, 1, 1, 0.85 * alpha); cs.set_line_width(2.0); cs.stroke()
+    cg.arc(cx, cy, radius * 0.66, 0, 2 * math.pi)
+    cg.set_source_rgba(1, 1, 1, 0.40 * alpha); cg.set_line_width(4.5); cg.stroke()
+
+    look_x = math.sin(t * 1.6) * 5.0
+    cs.arc(cx + look_x, cy + 3.0, radius * 0.24, 0, 2 * math.pi)
+    cs.set_source_rgba(1, 1, 1, 0.96 * alpha); cs.set_line_width(2.2); cs.stroke()
+    cs.arc(cx + look_x, cy + 3.0, 3.5, 0, 2 * math.pi); cs.fill()
+
+    if scan_targets:
+        cs.set_dash([7.0, 7.0], -t * 28.0)
+        for tx_s, ty_s in scan_targets:
+            cs.move_to(cx, cy + radius * 0.68); cs.line_to(tx_s, ty_s)
+            cs.set_source_rgba(1, 1, 1, 0.34 * alpha); cs.set_line_width(1.5); cs.stroke()
+    cs.restore(); cg.restore()
+
+
 def draw_tehran_skyline(cs, cg, y_base: float, alpha: float = 1.0, draw_p: float = 1.0):
     """
     @ensan.besham Panel 4 homage: Alborz mountain ridge + Azadi Tower (left) + Milad Tower (right) + skyline blocks!

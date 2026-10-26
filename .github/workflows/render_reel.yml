@@ -124,3 +124,4 @@ jobs:
             qa_report/alignment.json
             qa_report/subtitle_strip_verify.png
             qa_report/storyboard_12_scenes.png
+            qa_report/storyboard_24_shots.png

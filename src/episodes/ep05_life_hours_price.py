@@ -1,3 +1,18 @@
+"""
+Episode 05 (Studio v4.0 — @ensan.besham Hyper-Cut Character & Foley Cinema Edition)
+Topic: «چند ساعت از عمرت رو دادی تا اون گوشی دستت باشه؟ (قیمتِ واقعیِ اجناس به ساعتِ عمر)»
+Page: زاویه ذهن (@zavieh.penhann)
+
+v4.0 Hyper-Cut Upgrades:
+  - 24 Rapid-Fire Visual Shots across ~69s (~2.7s average shot length — exact @ensan.besham cut velocity!)
+  - Human Character Protagonist + POV Hand/Thumb Rig acting in nearly every shot (picking up phone with
+    volumetric face glow, thumb swiping prices, soul draining from chest, crumbling life pedestal, hunched
+    office typing, social envy pedestals, carrying giant boulder-phone, puppet-strings, snapping chains free!)
+  - Giant ExtraBold @ensan.besham Focal Numbers (eb_84 / eb_92) in pure #000000 OLED space (minimalist, zero clutter)
+  - 38 Multi-Layer Stereo Foley & Cinema Impact SFX cues (+200° sound design upgrade) + D-minor 120-BPM Score
+  - Locked Voice: Gemini 'Rasalgethi' + 129-tap @ensan.besham FIR + -0.34st Formant Calibration
+  - Subtitles & Boxes: 0.000px baseline-locked 64px-feathered RTL wipe + 100% Zero-Overflow containers
+"""
 import os, sys, math, time, json, subprocess
 import cairocffi as cairo
 from PIL import Image
@@ -10,32 +25,21 @@ from src.engine.render_core import (
     window_fade, fa, get_text_sprite, get_fitted_text_sprite,
     rounded_rect_path, set_stroke_draw, draw_star4,
     draw_human_figure, draw_spotlight_cone, draw_hud_chrome,
-    draw_safe_card, draw_pill_badge, draw_folder_window,
-    draw_ambient_particles, draw_curved_arrow, draw_cursor_pointer,
+    draw_safe_card, draw_pill_badge,
+    draw_ambient_particles, draw_cursor_pointer,
     impact_punch, push_camera, pop_camera_and_transform_texts,
     draw_shockwave_ring, draw_hypnotic_chronograph_ring,
     draw_hourglass_monolith, draw_ecg_waveform,
+    draw_character_with_phone, draw_pov_phone_in_hand,
+    draw_character_at_desk, draw_observatory_eye,
     composite_oled_frame,
 )
-
-
-def draw_glow_line(cs, cg, x0: float, y0: float, x1: float, y1: float, alpha: float = 1.0, lw_s: float = 2.0, lw_g: float = 5.0):
-    if alpha <= 0.01:
-        return
-    cs.save(); cg.save(); cs.set_dash([]); cg.set_dash([])
-    cs.move_to(x0, y0); cs.line_to(x1, y1); cs.set_source_rgba(1, 1, 1, 0.92 * alpha); cs.set_line_width(lw_s); cs.stroke()
-    cg.move_to(x0, y0); cg.line_to(x1, y1); cg.set_source_rgba(1, 1, 1, 0.55 * alpha); cg.set_line_width(lw_g); cg.stroke()
-    cs.restore(); cg.restore()
 
 EP_CODE = "۰۵"
 EP_TITLE = "قیمت به ساعتِ عمر"
 
-# =============================================================================
-# 32 Colloquial Gut-Punching Segments (~64-67s @ ~175 WPM + 4.0s D-Minor Outro)
-# Zero English loanwords; 100% matched to _NUM_WORDS_FA for sub-pixel Whisper sync
-# =============================================================================
 SCRIPT_SEGMENTS = [
-    # Scene 1: Hypnotic X-Ray Smartphone Hook (0 - 10s)
+    # 0..5: Hook Sequence (Shots 1..6)
     ("همین گوشیی که الان توی دستته رو،",                "همین گوشیی که الان توی دستته رو،"),                # 0
     ("چند خریدی؟",                                      "چند خریدی؟"),                                      # 1
     ("پنجاه میلیون؟ شصت میلیون؟",                       "۵۰ میلیون؟ ۶۰ میلیون؟"),                           # 2
@@ -43,14 +47,14 @@ SCRIPT_SEGMENTS = [
     ("تو براش شصت میلیون پول ندادی؛",                   "تو براش ۶۰ میلیون پول ندادی؛"),                    # 4
     ("تو شیشصد ساعت از عمرت رو دادی!",                  "تو ۶۰۰ ساعت از عمرت رو دادی!"),                    # 5
 
-    # Scene 2: The Hidden Currency — Paper vs Irreversible Life-Hours (10 - 19s)
+    # 6..10: Hidden Currency Sequence (Shots 7..9)
     ("ما فکر می‌کنیم با پول خرید می‌کنیم؛",              "ما فکر می‌کنیم با پول خرید می‌کنیم؛"),              # 6
     ("ولی پول فقط یه کاغذِ واسطه‌ست!",                   "ولی پول فقط یه کاغذ واسطه‌ست!"),                   # 7
     ("واحدِ واقعیِ هر خریدی توی دنیا،",                  "واحد واقعی هر خریدی توی دنیا،"),                   # 8
     ("ساعت‌هایی از زندگیِ توئه،",                        "ساعت‌هایی از زندگی توئه،"),                         # 9
     ("که دیگه هیچ‌وقت برنمی‌گردن!",                      "که دیگه هیچ‌وقت برنمی‌گردن!"),                      # 10
 
-    # Scene 3: Brutal Math — 600 Hours = 75 Full Workdays = 1 Season of Youth (19 - 30s)
+    # 11..16: Brutal Math Sequence (Shots 10..14)
     ("بیا خیلی ساده حسابش کنیم:",                       "بیا خیلی ساده حسابش کنیم:"),                       # 11
     ("اگه با رفت‌وآمد و خستگیِ کار،",                    "اگه با رفت‌وآمد و خستگی کار،"),                     # 12
     ("ساعتی صد هزار تومن دربیاری،",                     "ساعتی ۱۰۰ هزار تومن دربیاری،"),                    # 13
@@ -58,160 +62,136 @@ SCRIPT_SEGMENTS = [
     ("یعنی هفتاد و پنج روزِ کاملِ کاری!",                "یعنی ۷۵ روز کامل کاری!"),                          # 15
     ("یعنی کلِ یه فصل از جوونیت!",                       "یعنی کل یه فصل از جوونیت!"),                       # 16
 
-    # Scene 4: Everyday X-Ray Scanner — Shoes, Luxury Dinner, Upgrades (30 - 40s)
+    # 17..21: Everyday X-Ray Sequence (Shots 15..17)
     ("حالا با همین عینک به اطرافت نگاه کن:",             "حالا با همین عینک به اطرافت نگاه کن:"),             # 17
     ("کفشِ شیش میلیونی؟",                                "کفش ۶ میلیونی؟"),                                  # 18
     ("شصت ساعت پای کار موندن!",                         "۶۰ ساعت پای کار موندن!"),                          # 19
     ("شامِ پرزرق‌وبرقِ دو میلیونی؟",                     "شام پرزرق‌وبرق ۲ میلیونی؟"),                       # 20
     ("بیست ساعت از آزادیِ خالصت!",                       "۲۰ ساعت از آزادی خالصت!"),                         # 21
 
-    # Scene 5: The Clockwork Wheel — When Things Own You (40 - 50s)
+    # 22..25: When Things Own You Sequence (Shots 18..20)
     ("تلخ‌ترین جاش کجاست؟",                              "تلخ‌ترین جاش کجاست؟"),                              # 22
     ("وقتی فقط برای چشم‌وهم‌چشمی خرید می‌کنی،",          "وقتی فقط برای چشم‌وهم‌چشمی خرید می‌کنی،"),          # 23
     ("دیگه تو صاحبِ وسایلت نیستی؛",                     "دیگه تو صاحب وسایلت نیستی؛"),                      # 24
     ("اون وسایل صاحبِ عمر و زندگیِ توئن!",               "اون وسایل صاحب عمر و زندگی توئن!"),                # 25
 
-    # Scene 6: 3-Second Mental Antidote — Break the Chain (50 - 58s)
+    # 26..28: 3-Second Antidote & Liberation (Shots 21..22)
     ("از امشب قبلِ هر خریدی،",                          "از امشب قبل هر خریدی،"),                           # 26
     ("قیمتش رو به ساعتِ عمرت تقسیم کن؛",                 "قیمتش رو به ساعت عمرت تقسیم کن؛"),                 # 27
     ("ببین واقعاً به اون‌همه زندگی می‌ارزه یا نه!",      "ببین واقعاً به اون‌همه زندگی می‌ارزه یا نه!"),      # 28
 
-    # Scene 7: Interactive Self-Calculation CTA (58 - 64s)
+    # 29..31: Meta Mirror CTA (Shot 23) + Outro (Shot 24)
     ("گوشیی که الان دستته،",                            "گوشیی که الان دستته،"),                            # 29
     ("چند ماه از عمرت پاش رفته؟",                       "چند ماه از عمرت پاش رفته؟"),                       # 30
     ("عددش رو همین الان تو کامنت بنویس!",                "عددش رو همین الان تو کامنت بنویس!"),                # 31
 ]
 
-# Synchronized Hypnotic Editing & Micro-SFX Cues
+# =============================================================================
+# 38 Multi-Layer Stereo Foley, Whip-Cut & Cinema Impact Cues (Studio v4.0)
+# Format: (cue_name, seg_idx, word_idx, sfx_kind, time_offset_sec)
+# =============================================================================
 SFX_CUE_MAP = [
-    ("s1_price",   2, 0, "ping"),       # "۵۰ میلیون؟ ۶۰ میلیون؟"
-    ("s1_secret",  3, 2, "scan"),       # "راز ترسناک" -> X-ray reveals hourglass inside phone!
-    ("s1_600",     5, 1, "stamp"),      # "۶۰۰ ساعت" -> 3D card flip + shockwave punch!
-    ("s2_paper",   6, 0, "whoosh"),     # Scene 2 transition -> Astronomical Balance Scale
-    ("s2_life",    9, 0, "heartbeat"),  # "ساعت‌هایی از زندگی توئه" -> Scale tips + ECG pulse
-    ("s3_calc",   11, 0, "whoosh"),     # Scene 3 -> Live HUD Life-Calculator
-    ("s3_rate",   13, 1, "click"),      # "۱۰۰ هزار تومن" -> Rate locks in
-    ("s3_75d",    15, 1, "tick"),       # "۷۵ روز کامل کاری" -> 75-day domino wave completes
-    ("s3_season", 16, 2, "stamp"),      # "یه فصل از جوونیت!" -> Shockwave badge
-    ("s4_lens",   17, 0, "scan"),       # Scene 4 -> Everyday X-ray scanner
-    ("s4_shoe",   19, 0, "ping"),       # "۶۰ ساعت"
-    ("s4_din",    21, 0, "ping"),       # "۲۰ ساعت"
-    ("s5_wheel",  22, 0, "whoosh"),     # Scene 5 -> Giant Clockwork Wheel + Running Human
-    ("s5_own",    25, 1, "heartbeat"),  # "صاحب عمر و زندگی توئن!" -> Chain pulse
-    ("s6_rule",   26, 0, "whoosh"),     # Scene 6 -> 3-Second Filter Portal
-    ("s6_worth",  28, 3, "shatter"),    # "زندگی می‌ارزه" -> Chains shatter into fireflies!
-    ("s7_cta",    29, 0, "click"),      # Scene 7 -> 1 / 2 / 3 Comment Trigger
+    ("c01_pickup",   0, 0, "screen_on",    0.18),  # Shot 01: Character lifts phone, screen cone lights face
+    ("c02_pov",      1, 0, "whip",        -0.05),  # Shot 02: Whip zoom into POV hand holding phone
+    ("c03_p50",      2, 0, "swipe",       -0.06),  # Shot 03: Thumb swipes -> 50M
+    ("_c03_slam1",   2, 0, "cash_slam",    0.04),
+    ("c03_p60",      2, 2, "swipe",       -0.06),  # Thumb swipes -> 60M!
+    ("_c03_slam2",   2, 2, "cash_slam",    0.04),
+    ("c04_eye",      3, 0, "whip",        -0.04),  # Shot 04: Observatory Eye X-ray scan
+    ("_c04_scan",    3, 2, "scan",         0.00),
+    ("c05_slash",    4, 0, "whip",        -0.04),  # Shot 05: 60M banknote sliced in half!
+    ("_c05_blade",   4, 2, "slash",        0.05),
+    ("_c06_riser",   5, 0, "riser",       -0.68),  # Pre-beat tension riser into 600 HOURS!
+    ("c06_600",      5, 1, "impact_boom", -0.02),  # Shot 06: 600 HOURS boom + soul stream!
+    ("_c06_hb",      5, 3, "heartbeat",    0.05),
+
+    ("c07_paper",    6, 0, "whip",        -0.04),  # Shot 07: Two humans exchanging ghost paper
+    ("_c07_vanish",  7, 3, "whoosh",       0.00),
+    ("c08_chest",    8, 0, "whip",        -0.04),  # Shot 08: Dive inside human chest heart-clock!
+    ("_c08_hb1",     8, 2, "heartbeat",    0.02),
+    ("c08_life",     9, 0, "heartbeat",    0.00),
+    ("c09_crumble", 10, 0, "crumble",     -0.02),  # Shot 09: Life pedestal crumbles into abyss!
+
+    ("c10_desk",    11, 0, "whip",        -0.04),  # Shot 10: Hunched office worker typing fast
+    ("_c10_type1",  12, 0, "typing",       0.02),
+    ("_c10_type2",  12, 3, "typing",       0.05),
+    ("c11_100k",    13, 0, "stamp",       -0.02),  # Shot 11: 100,000 Toman hourly stamp + worker
+    ("_c11_reg",    13, 1, "cash_slam",    0.04),
+    ("c12_iphone",  14, 0, "whip",        -0.04),  # Shot 12: Rear Pro iPhone = spinning counter
+    ("c13_75d",     15, 0, "domino_burst", 0.00),  # Shot 13: 75-day calendar machine-gun domino burst!
+    ("_c13_hit",    15, 2, "stamp",        0.05),
+    ("c14_season",  16, 0, "whoosh",      -0.04),  # Shot 14: Whole season of youth blowing away
+    ("_c14_ping",   16, 3, "ping",         0.02),
+
+    ("c15_glasses", 17, 0, "click",       -0.02),  # Shot 15: X-ray glasses snap onto character's eyes
+    ("_c15_scan",   17, 2, "scan",         0.04),
+    ("c16_shoe",    18, 0, "whip",        -0.04),  # Shot 16: Sneaker -> 60 HOURS + treadmill runner
+    ("c16_60h",     19, 0, "stamp",       -0.02),
+    ("c17_dinner",  20, 0, "whip",        -0.04),  # Shot 17: Silver cloche lifts -> 20 HOURS!
+    ("_c17_ding",   20, 1, "bell_ding",    0.04),
+    ("c17_20h",     21, 0, "stamp",       -0.02),
+
+    ("c18_envy",    22, 0, "whip",        -0.04),  # Shot 18: Social comparison pedestals
+    ("_c18_ping",   23, 2, "ping",         0.02),
+    ("c19_boulder", 24, 0, "chain_clink", -0.02),  # Shot 19: Character carrying giant boulder-phone on back!
+    ("_c20_riser",  25, 0, "riser",       -0.65),
+    ("c20_puppet",  25, 0, "impact_boom", -0.02),  # Shot 20: Puppet-master phone holding human on strings!
+    ("_c20_hb",     25, 3, "heartbeat",    0.04),
+
+    ("c21_filter",  26, 0, "whip",        -0.04),  # Shot 21: POV checkout pause (Price / Hourly Life)
+    ("_c21_tick",   27, 2, "tick",         0.00),
+    ("c22_free",    28, 0, "shatter",      0.06),  # Shot 22: Chains shatter -> character drops phone & awakens!
+
+    ("c23_cta",     29, 0, "whip",        -0.04),  # Shot 23: Mirror meta-shot + 3 rising choice pillars!
+    ("_c23_c1",     30, 1, "click",        0.00),
+    ("_c23_c2",     31, 0, "click",        0.05),
 ]
 
 
 # =============================================================================
-# Bespoke 60fps Vector Art Primitives for Episode 05
+# Episode 05 Bespoke Rapid-Shot Vector Helpers
 # =============================================================================
 
-def draw_flagship_phone(
-    cs, cg, cx: float, cy: float, w: float, h: float,
-    alpha: float = 1.0, draw_p: float = 1.0, glow: bool = True
-):
-    """Minimalist museum-grade flagship smartphone bezel + Dynamic Island + side buttons."""
+def draw_glow_line(cs, cg, x0: float, y0: float, x1: float, y1: float, alpha: float = 1.0, lw_s: float = 2.2, lw_g: float = 5.2):
+    if alpha <= 0.01:
+        return
+    cs.save(); cg.save(); cs.set_dash([]); cg.set_dash([])
+    cs.move_to(x0, y0); cs.line_to(x1, y1); cs.set_source_rgba(1, 1, 1, 0.92 * alpha); cs.set_line_width(lw_s); cs.stroke()
+    cg.move_to(x0, y0); cg.line_to(x1, y1); cg.set_source_rgba(1, 1, 1, 0.55 * alpha); cg.set_line_width(lw_g); cg.stroke()
+    cs.restore(); cg.restore()
+
+
+def draw_pro_rear_iphone(cs, cg, cx: float, cy: float, w: float, h: float, alpha: float = 1.0, draw_p: float = 1.0):
+    """Exact @ensan.besham v03_4M Flagship Rear Triple-Camera Smartphone silhouette."""
     if alpha <= 0.01 or draw_p <= 0.01:
         return
     dp = clamp(draw_p)
     x0, y0 = cx - w / 2.0, cy - h / 2.0
-    rad = min(40.0, w * 0.15)
-
-    # Subtle obsidian inner glass fill
-    cs.save()
-    cs.set_dash([])
-    rounded_rect_path(cs, x0, y0, w, h, rad)
-    cs.set_source_rgba(0.03, 0.03, 0.045, 0.90 * alpha * dp)
-    cs.fill()
-    cs.restore()
-
-    for ctx, lw, al in ((cs, 3.0, alpha * 0.96), (cg, 6.2, alpha * (0.55 if glow else 0.22))):
+    rad = w * 0.17
+    for ctx, lw, al in ((cs, 2.8, alpha * 0.96), (cg, 6.0, alpha * 0.45)):
         ctx.save()
-        set_stroke_draw(ctx, dp, 2.0 * (w + h))
+        set_stroke_draw(ctx, dp, 2.2 * (w + h))
         rounded_rect_path(ctx, x0, y0, w, h, rad)
-        ctx.set_source_rgba(1, 1, 1, al)
-        ctx.set_line_width(lw)
-        ctx.stroke()
-        # Inner bezel hairline
-        rounded_rect_path(ctx, x0 + 10, y0 + 10, w - 20, h - 20, max(16.0, rad - 8.0))
-        ctx.set_source_rgba(1, 1, 1, al * 0.35)
-        ctx.set_line_width(1.2)
-        ctx.stroke()
-        ctx.restore()
-
-    if dp > 0.55:
-        cs.save(); cg.save()
-        cs.set_dash([]); cg.set_dash([])
-        # Dynamic Island pill
-        iw, ih = w * 0.30, 14.0
-        rounded_rect_path(cs, cx - iw / 2.0, y0 + 22.0, iw, ih, 7.0)
-        cs.set_source_rgba(1, 1, 1, 0.72 * alpha); cs.set_line_width(1.7); cs.stroke()
-        # Side tactile buttons
-        cs.move_to(x0 - 3, cy - 75); cs.line_to(x0 - 3, cy - 30); cs.stroke()
-        cs.move_to(x0 - 3, cy - 12); cs.line_to(x0 - 3, cy + 32); cs.stroke()
-        cs.move_to(x0 + w + 3, cy - 45); cs.line_to(x0 + w + 3, cy + 18); cs.stroke()
-        cs.restore(); cg.restore()
-
-
-def draw_clock_gear(
-    cs, cg, cx: float, cy: float, r_pitch: float, n_teeth: int,
-    rot_rad: float, alpha: float = 1.0, glow: bool = False
-):
-    """Precision involute-style mechanical clockwork gear with inner spokes."""
-    if alpha <= 0.01:
-        return
-    r_in = r_pitch - 11.0
-    r_out = r_pitch + 11.0
-    step = 2.0 * math.pi / n_teeth
-
-    for ctx, lw, al in ((cs, 2.2, alpha * 0.88), (cg, 4.8, alpha * (0.42 if glow else 0.18))):
-        ctx.save()
+        ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw); ctx.stroke()
+        # Camera bump module (top-left)
+        cw = w * 0.44
+        rounded_rect_path(ctx, x0 + w * 0.09, y0 + w * 0.09, cw, cw, cw * 0.26)
+        ctx.set_line_width(lw * 0.78); ctx.stroke()
         ctx.set_dash([])
-        for i in range(n_teeth):
-            a0 = rot_rad + i * step
-            a1 = a0 + step * 0.22
-            a2 = a0 + step * 0.48
-            a3 = a0 + step * 0.70
-            p0 = (cx + math.cos(a0) * r_in,  cy + math.sin(a0) * r_in)
-            p1 = (cx + math.cos(a1) * r_out, cy + math.sin(a1) * r_out)
-            p2 = (cx + math.cos(a2) * r_out, cy + math.sin(a2) * r_out)
-            p3 = (cx + math.cos(a3) * r_in,  cy + math.sin(a3) * r_in)
-            if i == 0:
-                ctx.move_to(*p0)
-            else:
-                ctx.line_to(*p0)
-            ctx.line_to(*p1); ctx.line_to(*p2); ctx.line_to(*p3)
-        ctx.close_path()
-        ctx.set_source_rgba(1, 1, 1, al)
-        ctx.set_line_width(lw)
-        ctx.stroke()
-
-        # Inner rim + 6 structural spokes
-        r_hub = r_pitch * 0.20
-        r_rim = r_pitch * 0.82
-        ctx.arc(cx, cy, r_rim, 0, 2 * math.pi)
-        ctx.set_source_rgba(1, 1, 1, al * 0.55); ctx.set_line_width(1.5); ctx.stroke()
-        ctx.arc(cx, cy, r_hub, 0, 2 * math.pi)
-        ctx.set_source_rgba(1, 1, 1, al * 0.75); ctx.set_line_width(1.8); ctx.stroke()
-        for sp_i in range(6):
-            sa = rot_rad + sp_i * (math.pi / 3.0)
-            ctx.move_to(cx + math.cos(sa) * r_hub, cy + math.sin(sa) * r_hub)
-            ctx.line_to(cx + math.cos(sa) * r_rim, cy + math.sin(sa) * r_rim)
-            ctx.set_source_rgba(1, 1, 1, al * 0.38); ctx.set_line_width(1.6); ctx.stroke()
+        if dp > 0.45:
+            r_lens = cw * 0.17
+            bx, by = x0 + w * 0.09, y0 + w * 0.09
+            for lx_o, ly_o in ((0.28, 0.28), (0.28, 0.72), (0.72, 0.50)):
+                ctx.arc(bx + cw * lx_o, by + cw * ly_o, r_lens, 0, 2 * math.pi); ctx.stroke()
         ctx.restore()
 
 
-def draw_running_human_60fps(
-    cs, cg, cx: float, foot_y: float, scale: float, t: float, alpha: float = 1.0, facing_left: bool = True
-):
-    """60fps articulated running human figure (sine-coupled stride + arm swing + forward lean)."""
+def draw_running_human_60fps(cs, cg, cx: float, foot_y: float, scale: float, t: float, alpha: float = 1.0, facing_left: bool = True):
+    """60fps articulated running human figure."""
     if alpha <= 0.01:
         return
     sgn = -1.0 if facing_left else 1.0
-    ph = t * 8.4  # Crisp athletic stride cadence
-
+    ph = t * 9.5
     hip_x = cx
     hip_y = foot_y - 68.0 * scale + abs(math.sin(ph)) * 7.0 * scale
     sh_x  = hip_x + sgn * 14.0 * scale
@@ -219,101 +199,138 @@ def draw_running_human_60fps(
     hd_x  = sh_x + sgn * 8.0 * scale
     hd_y  = sh_y - 24.0 * scale
 
-    for ctx, lw, al in ((cs, 3.0, alpha * 0.96), (cg, 6.0, alpha * 0.45)):
-        ctx.save()
-        ctx.set_dash([])
-        ctx.set_line_cap(cairo.LINE_CAP_ROUND)
-        ctx.set_line_join(cairo.LINE_JOIN_ROUND)
-        ctx.set_source_rgba(1, 1, 1, al)
-        ctx.set_line_width(lw)
-
-        # Head
+    for ctx, lw, al in ((cs, 2.8, alpha * 0.96), (cg, 5.5, alpha * 0.42)):
+        ctx.save(); ctx.set_dash([])
+        ctx.set_line_cap(cairo.LINE_CAP_ROUND); ctx.set_line_join(cairo.LINE_JOIN_ROUND)
+        ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw)
         ctx.arc(hd_x, hd_y, 15.0 * scale, 0, 2 * math.pi); ctx.stroke()
-        # Torso
         ctx.move_to(sh_x, sh_y); ctx.line_to(hip_x, hip_y); ctx.stroke()
-
-        # Two legs in counter-phase
-        for leg_off, op_mul in ((0.0, 1.0), (math.pi, 0.68)):
+        for leg_off, op_m in ((0.0, 1.0), (math.pi, 0.65)):
             sw = math.sin(ph + leg_off)
             lift = max(0.0, math.cos(ph + leg_off))
             kx = hip_x + sgn * (20.0 * sw + 8.0) * scale
             ky = hip_y + (34.0 - 10.0 * lift) * scale
             fx = kx + sgn * (16.0 * sw - 12.0 * lift) * scale
             fy = hip_y + (66.0 - 22.0 * lift) * scale
-            ctx.set_source_rgba(1, 1, 1, al * op_mul)
+            ctx.set_source_rgba(1, 1, 1, al * op_m)
             ctx.move_to(hip_x, hip_y); ctx.line_to(kx, ky); ctx.line_to(fx, fy); ctx.stroke()
-
-        # Two arms in counter-phase (front arm reaching toward phone!)
-        for arm_off, op_mul in ((math.pi, 1.0), (0.0, 0.65)):
+        for arm_off, op_m in ((math.pi, 1.0), (0.0, 0.65)):
             aw = math.sin(ph + arm_off)
             ex = sh_x + sgn * (18.0 * aw + 6.0) * scale
             ey = sh_y + 24.0 * scale
-            hx = ex + sgn * (20.0 * max(-0.2, aw) + 12.0) * scale
-            hy = ey - (10.0 + 12.0 * aw) * scale
-            ctx.set_source_rgba(1, 1, 1, al * op_mul)
+            hx = ex + sgn * (18.0 * max(-0.2, aw) + 10.0) * scale
+            hy = ey - (10.0 + 10.0 * aw) * scale
+            ctx.set_source_rgba(1, 1, 1, al * op_m)
             ctx.move_to(sh_x, sh_y); ctx.line_to(ex, ey); ctx.line_to(hx, hy); ctx.stroke()
         ctx.restore()
 
-    # Return leading wrist coordinate so clock-chains can attach cleanly!
-    aw_front = math.sin(ph + math.pi)
-    ex_f = sh_x + sgn * (18.0 * aw_front + 6.0) * scale
-    ey_f = sh_y + 24.0 * scale
-    wx = ex_f + sgn * (20.0 * max(-0.2, aw_front) + 12.0) * scale
-    wy = ey_f - (10.0 + 12.0 * aw_front) * scale
-    return wx, wy
 
-
-def draw_mini_everyday_icon(cs, cg, kind: str, cx: float, cy: float, t: float, alpha: float = 1.0, active: float = 0.0):
-    """Animated bespoke vector icons for Scene 4 rows: 'shoe', 'dinner', 'phone'."""
+def draw_sisyphus_human_boulder_phone(cs, cg, cx: float, ground_y: float, scale: float, t: float, alpha: float = 1.0):
+    """Human bent at 45 deg pushing/carrying a gigantic monolithic smartphone up a steep slope!"""
     if alpha <= 0.01:
         return
-    bob = math.sin(t * 3.4) * 3.5 * (0.3 + 0.7 * active)
-    cy = cy + bob
-    for ctx, lw, al in ((cs, 2.3, alpha * 0.94), (cg, 4.8, alpha * (0.22 + 0.38 * active))):
-        ctx.save()
-        ctx.set_dash([])
-        ctx.set_source_rgba(1, 1, 1, al)
-        ctx.set_line_width(lw)
-        if kind == "shoe":
-            # Crisp minimalist sneaker silhouette
-            ctx.move_to(cx - 42, cy + 20)
-            ctx.line_to(cx + 42, cy + 20)
-            ctx.curve_to(cx + 44, cy + 6, cx + 30, cy + 2, cx + 12, cy - 4)
-            ctx.line_to(cx - 6, cy - 22)
-            ctx.line_to(cx - 24, cy - 18)
-            ctx.line_to(cx - 38, cy + 4)
-            ctx.close_path(); ctx.stroke()
-            # Sole line + laces
-            ctx.move_to(cx - 42, cy + 13); ctx.line_to(cx + 41, cy + 13); ctx.stroke()
-            ctx.move_to(cx + 2, cy - 14); ctx.line_to(cx + 10, cy - 8); ctx.stroke()
-            ctx.move_to(cx + 8, cy - 9); ctx.line_to(cx + 16, cy - 3); ctx.stroke()
-        elif kind == "dinner":
-            # Fine-dining silver cloche platter + rising aroma wave
-            ctx.move_to(cx - 46, cy + 18); ctx.line_to(cx + 46, cy + 18); ctx.stroke()
-            lift = 6.0 * active
-            ctx.arc(cx, cy + 14 - lift, 36.0, math.pi, 2 * math.pi); ctx.close_path(); ctx.stroke()
-            ctx.arc(cx, cy - 25 - lift, 4.5, 0, 2 * math.pi); ctx.stroke()
-            if ctx is cs:
-                for si in (-14, 0, 14):
-                    sw_s = math.sin(t * 4.0 + si) * 5.0
-                    ctx.move_to(cx + si, cy - 32 - lift)
-                    ctx.curve_to(cx + si + sw_s, cy - 38 - lift, cx + si - sw_s, cy - 44 - lift, cx + si, cy - 50 - lift)
-                    ctx.set_source_rgba(1, 1, 1, al * 0.55); ctx.set_line_width(1.4); ctx.stroke()
-        else:
-            # Sleek mini smartphone + upgrade arrow
-            rounded_rect_path(ctx, cx - 22, cy - 36, 44, 72, 9); ctx.stroke()
-            ctx.move_to(cx - 7, cy - 28); ctx.line_to(cx + 7, cy - 28); ctx.stroke()
-            ctx.move_to(cx, cy + 14); ctx.line_to(cx, cy - 12); ctx.stroke()
-            ctx.move_to(cx - 9, cy - 3); ctx.line_to(cx, cy - 13); ctx.line_to(cx + 9, cy - 3); ctx.stroke()
+    step_ph = t * 5.6
+    bob = abs(math.sin(step_ph)) * 6.5
+    # Steep uphill slope line (left-low -> right-high: y(x) = ground_y - (x - cx)*0.24)
+    for ctx, lw, al in ((cs, 2.4, alpha * 0.72), (cg, 4.8, alpha * 0.28)):
+        ctx.save(); ctx.set_dash([])
+        ctx.move_to(110, ground_y + 102); ctx.line_to(970, ground_y - 104)
+        ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw); ctx.stroke()
+        ctx.restore()
+
+    # 1. Draw GIGANTIC Smartphone boulder FIRST on upper-left of character's back so human stays 100% visible!
+    for ctx, lw, al in ((cs, 3.2, alpha * 0.96), (cg, 6.8, alpha * 0.48)):
+        ctx.save(); ctx.set_dash([])
+        ctx.translate(cx - 58 * scale, ground_y - 238 * scale - bob)
+        ctx.rotate(-0.58)
+        rounded_rect_path(ctx, -92 * scale, -162 * scale, 184 * scale, 324 * scale, 26 * scale)
+        if ctx is cs:
+            ctx.set_source_rgba(0.03, 0.03, 0.045, 0.94 * alpha); ctx.fill_preserve()
+        ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw); ctx.stroke()
+        rounded_rect_path(ctx, -28 * scale, -142 * scale, 56 * scale, 10 * scale, 5 * scale); ctx.stroke()
+        ctx.restore()
+
+    # 2. Draw Strained Bent Human Body ON TOP (clearly visible head, curved spine, bracing arms & trudging legs!)
+    hx_base = cx + 48 * scale
+    hy_ground = ground_y - (hx_base - cx) * 0.24
+    hip_x, hip_y = hx_base - 24 * scale, hy_ground - 72 * scale - bob
+    sh_x, sh_y   = hx_base + 34 * scale, hy_ground - 118 * scale - bob
+    hd_x, hd_y   = hx_base + 66 * scale, hy_ground - 122 * scale - bob
+
+    for ctx, lw, al in ((cs, 3.4, alpha * 0.98), (cg, 6.5, alpha * 0.48)):
+        ctx.save(); ctx.set_dash([])
+        ctx.set_line_cap(cairo.LINE_CAP_ROUND); ctx.set_line_join(cairo.LINE_JOIN_ROUND)
+        ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw)
+        # Head strained forward
+        ctx.arc(hd_x, hd_y, 18 * scale, 0, 2 * math.pi); ctx.stroke()
+        # Bent spine
+        ctx.move_to(hip_x, hip_y); ctx.line_to(sh_x, sh_y); ctx.stroke()
+        # Two trudging legs planted on the slope
+        for loff in (0.0, math.pi):
+            sw = math.sin(step_ph + loff) * 24 * scale
+            fx = hip_x + 8 * scale + sw
+            fy = ground_y - (fx - cx) * 0.24 - max(0.0, math.cos(step_ph + loff)) * 14 * scale
+            kx = 0.5 * (hip_x + fx) + 14 * scale
+            ky = 0.5 * (hip_y + fy) - 6 * scale
+            ctx.move_to(hip_x, hip_y); ctx.line_to(kx, ky); ctx.line_to(fx, fy); ctx.stroke()
+        # Arms reaching up & back to grip the massive smartphone strap!
+        ctx.move_to(sh_x, sh_y)
+        ctx.line_to(sh_x - 8 * scale, sh_y - 38 * scale)
+        ctx.line_to(sh_x - 46 * scale, sh_y - 54 * scale)
+        ctx.stroke()
+        # Glowing tether chain across chest holding the boulder-phone
+        ctx.set_dash([6.0, 5.0])
+        ctx.move_to(sh_x + 8 * scale, sh_y + 8 * scale)
+        ctx.line_to(cx - 25 * scale, ground_y - 185 * scale - bob)
+        ctx.set_line_width(lw * 0.72); ctx.stroke()
+        ctx.restore()
+
+
+def draw_clock_gear(cs, cg, cx: float, cy: float, r_pitch: float, n_teeth: int, rot_rad: float, alpha: float = 1.0):
+    if alpha <= 0.01:
+        return
+    r_in, r_out = r_pitch - 10.0, r_pitch + 10.0
+    step = 2.0 * math.pi / n_teeth
+    for ctx, lw, al in ((cs, 2.2, alpha * 0.85), (cg, 4.8, alpha * 0.35)):
+        ctx.save(); ctx.set_dash([])
+        for i in range(n_teeth):
+            a0 = rot_rad + i * step
+            pts = [
+                (cx + math.cos(a0) * r_in, cy + math.sin(a0) * r_in),
+                (cx + math.cos(a0 + step * 0.22) * r_out, cy + math.sin(a0 + step * 0.22) * r_out),
+                (cx + math.cos(a0 + step * 0.48) * r_out, cy + math.sin(a0 + step * 0.48) * r_out),
+                (cx + math.cos(a0 + step * 0.70) * r_in, cy + math.sin(a0 + step * 0.70) * r_in),
+            ]
+            if i == 0: ctx.move_to(*pts[0])
+            else: ctx.line_to(*pts[0])
+            for px, py in pts[1:]: ctx.line_to(px, py)
+        ctx.close_path()
+        ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw); ctx.stroke()
+        ctx.arc(cx, cy, r_pitch * 0.80, 0, 2 * math.pi); ctx.set_line_width(1.4); ctx.stroke()
         ctx.restore()
 
 
 # =============================================================================
-# Master 60fps Scene Choreography & Virtual Camera Renderer
+# Master 24-Shot Hyper-Cut Renderer (60fps)
 # =============================================================================
 
+def _shot_win(t: float, t0: float, t1: float, fi: float = 0.14, fo: float = 0.16) -> float:
+    """Snappy @ensan.besham shot window with fast 8-frame whip transitions (zero sluggish overlap!)."""
+    return window_fade(t, t0 - 0.02, t1 + 0.02, fi=fi, fo=fo)
+
+
+def _shot_cam_z(t: float, t0: float, t1: float, base_in: float = 0.92) -> float:
+    """Snappy entry zoom-snap + continuous forward drift + whip-zoom exit!"""
+    dur = max(0.35, t1 - t0)
+    u = clamp((t - t0) / dur)
+    z_in = base_in + (1.0 - base_in) * ease_out_cubic(clamp((t - t0) / 0.28))
+    z_drift = 0.032 * u
+    z_out = clamp((t - (t1 - 0.18)) / 0.20) ** 2 * 0.09
+    return z_in + z_drift + z_out
+
+
 def render_scene_frame(
-    t: float, total_dur: float, t_cues: dict, sub_lines: list[dict],
+    t: float, total_dur: float, tc: dict, sub_lines: list[dict],
     fonts: FontBank, surf_glow, ctx_glow, surf_sharp, ctx_sharp
 ) -> bytes:
     for ctx in (ctx_glow, ctx_sharp):
@@ -325,575 +342,707 @@ def render_scene_frame(
     cs, cg = ctx_sharp, ctx_glow
     txts = []
 
-    t_s1_price  = t_cues["s1_price"]
-    t_s1_sec    = t_cues["s1_secret"]
-    t_s1_600    = t_cues["s1_600"]
-    t_s2_paper  = t_cues["s2_paper"]
-    t_s2_life   = t_cues["s2_life"]
-    t_s3_calc   = t_cues["s3_calc"]
-    t_s3_rate   = t_cues["s3_rate"]
-    t_s3_75d    = t_cues["s3_75d"]
-    t_s3_season = t_cues["s3_season"]
-    t_s4_lens   = t_cues["s4_lens"]
-    t_s4_shoe   = t_cues["s4_shoe"]
-    t_s4_din    = t_cues["s4_din"]
-    t_s5_wheel  = t_cues["s5_wheel"]
-    t_s5_own    = t_cues["s5_own"]
-    t_s6_rule   = t_cues["s6_rule"]
-    t_s6_worth  = t_cues["s6_worth"]
-    t_s7_cta    = t_cues["s7_cta"]
-    outro_t0    = total_dur - 4.0
+    outro_t0 = total_dur - 4.0
 
-    chapters = [0.0, t_s2_paper, t_s3_calc, t_s4_lens, t_s5_wheel, t_s6_rule, t_s7_cta]
+    # Exact 24-Shot Timeline Boundaries anchored directly to Whisper word timestamps!
+    b01 = 0.0
+    b02 = tc["c02_pov"]
+    b03 = tc["c03_p50"]
+    b04 = tc["c04_eye"]
+    b05 = tc["c05_slash"]
+    b06 = tc["c06_600"] - 0.12
+    b07 = tc["c07_paper"]
+    b08 = tc["c08_chest"]
+    b09 = tc["c09_crumble"] - 0.10
+    b10 = tc["c10_desk"]
+    b11 = tc["c11_100k"] - 0.10
+    b12 = tc["c12_iphone"]
+    b13 = tc["c13_75d"] - 0.10
+    b14 = tc["c14_season"]
+    b15 = tc["c15_glasses"]
+    b16 = tc["c16_shoe"]
+    b17 = tc["c17_dinner"]
+    b18 = tc["c18_envy"]
+    b19 = tc["c19_boulder"]
+    b20 = tc["c20_puppet"] - 0.10
+    b21 = tc["c21_filter"]
+    b22 = tc["c22_free"] - 0.10
+    b23 = tc["c23_cta"]
+    b24 = outro_t0
+
+    chapters = [0.0, b07, b10, b15, b18, b21, b23]
     draw_hud_chrome(cs, cg, txts, fonts, t, total_dur, EP_CODE, EP_TITLE, chapters)
+    draw_ambient_particles(cs, t, alpha=0.88 * clamp((outro_t0 - t) / 0.8))
 
-    amb_alpha = clamp((outro_t0 - t) / 0.8)
-    draw_ambient_particles(cs, t, alpha=0.92 * amb_alpha)
-
-    # =========================================================================
-    # SCENE 1 (0 .. t_s2_paper): HYPNOTIC X-RAY SMARTPHONE -> 600 LIFE-HOURS!
-    # =========================================================================
-    w1 = window_fade(t, -0.1, t_s2_paper + 0.02, fi=0.20, fo=0.28)
-    if w1 > 0.01:
+    # -------------------------------------------------------------------------
+    # SHOT 01 (b01..b02): Character in dark room lifts smartphone up to face!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b01, b02)
+    if w > 0.01:
         stx = []
-        u1 = clamp(t / max(1.0, t_s2_paper))
-        whip_out1 = clamp((t - (t_s2_paper - 0.26)) / 0.28) ** 2 * 0.08
-        cam_z = (0.95 + 0.08 * ease_out_cubic(min(1.0, t / 0.85))
-                 + 0.032 * u1 + whip_out1
-                 + impact_punch(t, t_s1_600, amp=0.038, dur=0.60))
-        cam_dy = math.sin(t * 1.1) * 4.0
-        push_camera(cs, cg, zoom=cam_z, dx=0.0, dy=cam_dy, px=540.0, py=805.0)
+        cz = _shot_cam_z(t, b01, b02, base_in=0.94)
+        push_camera(cs, cg, zoom=cz, px=540, py=860)
+        rp = ease_out_cubic(clamp((t - 0.08) / 0.85))
+        sg_p = ease_out_cubic(clamp((t - 0.35) / 0.55))
 
-        p_in = ease_out_cubic(clamp(t / 0.85))
-        xray_p = ease_in_out_cubic(clamp((t - (t_s1_sec - 0.15)) / 0.85))
-        flip_raw = clamp((t - (t_s1_600 - 0.12)) / 0.58)
-        shock_600 = clamp((t - t_s1_600) / 0.72)
+        # Ground line + subtle night window & wall clock (exact v04_11M mood!)
+        draw_glow_line(cs, cg, 220, 1085, 860, 1085, w * 0.45, lw_s=1.6, lw_g=3.5)
+        draw_hypnotic_chronograph_ring(cs, cg, 815, 455, 52.0, t, alpha=w * 0.45, draw_p=rp, speed=1.2)
 
-        draw_pill_badge(cs, cg, stx, "پشتِ صحنه‌ی قیمتِ گوشیِ توی دستت", 540, 238, fonts.reg_26, w1 * p_in)
+        draw_character_with_phone(cs, cg, 520, 1085, scale=1.85, raise_p=rp, screen_glow=sg_p, t=t, alpha=w, draw_p=min(1.0, t / 0.45 + 0.2))
+        sp_tu = get_fitted_text_sprite("تو — همین الان", fonts.reg_26, 300, (190, 190, 205, 255))
+        stx.append((sp_tu, 520, 1145, w * rp))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=860)
 
-        # Perpetual counter-rotating Swiss chronograph halo around smartphone!
-        draw_hypnotic_chronograph_ring(
-            cs, cg, 540, 745, 305.0, t,
-            alpha=w1 * (0.42 + 0.45 * xray_p), draw_p=p_in, speed=(1.0 + 1.4 * xray_p)
+    # -------------------------------------------------------------------------
+    # SHOT 02 (b02..b03): Extreme POV Close-Up — Hand & Thumb gripping Phone!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b02, b03)
+    if w > 0.01:
+        stx = []
+        cz = _shot_cam_z(t, b02, b03, base_in=0.86)
+        push_camera(cs, cg, zoom=cz, px=540, py=830)
+        p_in = ease_out_cubic(clamp((t - b02) / 0.32))
+        draw_pov_phone_in_hand(cs, cg, 540, 825, 340, 620, thumb_swipe=0.0, thumb_tap=0.0, alpha=w, draw_p=p_in)
+        sp_q = get_fitted_text_sprite("؟", fonts.eb_92, 240, (255, 255, 255, 255), glow=0.85)
+        sp_sub = get_fitted_text_sprite("فاکتورِ خرید", fonts.reg_30, 240, (195, 195, 210, 255))
+        stx.append((sp_q, 540, 760, w * p_in))
+        stx.append((sp_sub, 540, 855, w * p_in))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=830)
+
+    # -------------------------------------------------------------------------
+    # SHOT 03 (b03..b04): POV Hand Thumb Swiping Giant 50,000,000 -> 60,000,000!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b03, b04)
+    if w > 0.01:
+        stx = []
+        t60 = tc["c03_p60"]
+        is_60 = (t >= t60 - 0.04)
+        cz = _shot_cam_z(t, b03, b04, base_in=0.95) + impact_punch(t, b03, 0.035, 0.35) + impact_punch(t, t60, 0.042, 0.40)
+        push_camera(cs, cg, zoom=cz, px=540, py=830)
+
+        sw1 = clamp((t - (b03 - 0.06)) / 0.28) if not is_60 else 0.0
+        sw2 = clamp((t - (t60 - 0.06)) / 0.28) if is_60 else 0.0
+        draw_pov_phone_in_hand(cs, cg, 540, 825, 340, 620, thumb_swipe=max(sw1, sw2), thumb_tap=max(sw1, sw2), alpha=w, draw_p=1.0)
+
+        num_str = "۶۰,۰۰۰,۰۰۰" if is_60 else "۵۰,۰۰۰,۰۰۰"
+        sp_n = get_fitted_text_sprite(num_str, fonts.eb_68, 285, (255, 255, 255, 255), glow=0.85)
+        sp_t = get_fitted_text_sprite("تومان", fonts.bold_36, 260, (215, 215, 228, 255))
+        stx.append((sp_n, 540, 745, w))
+        stx.append((sp_t, 540, 825, w))
+        if is_60 and sw2 < 0.95:
+            draw_shockwave_ring(cs, cg, 540, 765, sw2, max_r=250.0, alpha=w * 0.75)
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=830)
+
+    # -------------------------------------------------------------------------
+    # SHOT 04 (b04..b05): Top AI Observatory Eye Scanning Character & Phone!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b04, b05)
+    if w > 0.01:
+        stx = []
+        cz = _shot_cam_z(t, b04, b05, base_in=0.92)
+        push_camera(cs, cg, zoom=cz, px=540, py=820)
+        phx, phy, chx, chy = draw_character_with_phone(cs, cg, 520, 1140, scale=1.75, raise_p=1.0, screen_glow=0.9, t=t, alpha=w)
+        draw_observatory_eye(cs, cg, 540, 345, radius=58.0, t=t, alpha=w, scan_targets=[(phx, phy), (chx, chy)])
+        draw_spotlight_cone(cs, cg, 540, 405, 330, 750, 1140, alpha=w * 0.65)
+        # Glowing target reticle pulsing on character's chest!
+        pr = 18.0 + math.sin(t * 9.0) * 5.0
+        cs.arc(chx, chy, pr, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.90 * w); cs.set_line_width(2.2); cs.stroke()
+        cg.arc(chx, chy, pr + 6, 0, 2 * math.pi); cg.set_source_rgba(1, 1, 1, 0.55 * w); cg.set_line_width(5.0); cg.stroke()
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=820)
+
+    # -------------------------------------------------------------------------
+    # SHOT 05 (b05..b06): Razor Blade Slash Slicing 60,000,000 Banknote in Half!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b05, b06)
+    if w > 0.01:
+        stx = []
+        cz = _shot_cam_z(t, b05, b06, base_in=0.93) + impact_punch(t, tc["_c05_blade"], 0.04, 0.40)
+        push_camera(cs, cg, zoom=cz, px=540, py=820)
+        sl_u = ease_out_cubic(clamp((t - (b05 + 0.28)) / 0.42))
+        sep = sl_u * 36.0
+
+        # Giant Banknote splitting apart!
+        for half_s in (-1.0, 1.0):
+            cs.save(); cs.set_dash([])
+            cs.translate(half_s * sep, -half_s * sep * 0.45)
+            cs.rotate(half_s * sl_u * 0.06)
+            rounded_rect_path(cs, 540 - 330, 760 - 135, 660, 270, 20)
+            cs.set_source_rgba(1, 1, 1, (0.80 - 0.45 * sl_u) * w); cs.set_line_width(2.6); cs.stroke()
+            cs.restore()
+
+        sp_60m = get_fitted_text_sprite("۶۰,۰۰۰,۰۰۰ تومان", fonts.eb_68, 600, (225, 225, 235, 255))
+        stx.append((sp_60m, 540, 760, w * (1.0 - 0.55 * sl_u)))
+        if sl_u > 0.02:
+            # Diagonal razor light-slash!
+            lx1 = 190 + 700 * sl_u
+            ly1 = 945 - 370 * sl_u
+            draw_glow_line(cs, cg, 190, 945, lx1, ly1, w, lw_s=4.0, lw_g=10.0)
+            sp_no = get_fitted_text_sprite("فقط ظاهرِ ماجراست!", fonts.bold_36, 620, (255, 255, 255, 255), glow=0.7)
+            stx.append((sp_no, 540, 1045, w * sl_u))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=820)
+
+    # -------------------------------------------------------------------------
+    # SHOT 06 (b06..b07): BOOM REVEAL — GIANT «۶۰۰ ساعت» + SOUL STREAM TO PHONE!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b06, b07)
+    if w > 0.01:
+        stx = []
+        shk = math.sin((t - b06) * 48.0) * 9.0 * math.exp(-max(0.0, t - b06) * 7.5) if t >= b06 else 0.0
+        cz = _shot_cam_z(t, b06, b07, base_in=0.88) + impact_punch(t, tc["c06_600"], 0.055, 0.55)
+        push_camera(cs, cg, zoom=cz, dx=shk, dy=-shk * 0.5, px=540, py=820)
+
+        sh_u = clamp((t - b06) / 0.70)
+        draw_shockwave_ring(cs, cg, 540, 480, sh_u, max_r=440.0, alpha=w)
+
+        # Giant @ensan.besham Focal Number in pure black space!
+        sp_big = get_fitted_text_sprite("۶۰۰ ساعت", fonts.eb_92, 860, (255, 255, 255, 255), glow=0.95)
+        sp_lbl = get_fitted_text_sprite("از عمرِ واقعیِ تو!", fonts.bold_44, 760, (235, 235, 248, 255), glow=0.5)
+        stx.append((sp_big, 540, 435, w))
+        stx.append((sp_lbl, 540, 545, w))
+
+        # Below: Character on right holding phone on left while torrent of soul-sparks drains from chest -> phone!
+        phx, phy, chx, chy = draw_character_with_phone(
+            cs, cg, 690, 1185, scale=1.75, raise_p=1.0, screen_glow=1.0, t=t, alpha=w, facing_right=False
         )
+        # Giant floating hourglass ghost behind phone
+        draw_hourglass_monolith(cs, cg, 335, 965, 130, 235, sand_top=clamp(0.75 - 0.45 * clamp((t - b06) / 2.5)), flowing=True, t=t, alpha=w * 0.90)
+        for oi in range(14):
+            ou = ((t * 1.45 + oi / 14.0) % 1.0)
+            ox = (1 - ou) ** 2 * chx + 2 * (1 - ou) * ou * 520 + ou ** 2 * 335
+            oy = (1 - ou) ** 2 * chy + 2 * (1 - ou) * ou * 785 + ou ** 2 * 965
+            oa = math.sin(math.pi * ou) * w
+            cs.arc(ox, oy, 4.0, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.96 * oa); cs.fill()
+            cg.arc(ox, oy, 9.5, 0, 2 * math.pi); cg.set_source_rgba(1, 1, 1, 0.68 * oa); cg.fill()
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, dx=shk, dy=-shk * 0.5, px=540, py=820)
 
-        # Center Flagship Smartphone (540, 745)
-        draw_flagship_phone(cs, cg, 540, 745, 256, 470, alpha=w1, draw_p=p_in, glow=True)
-
-        # Before X-ray: clean retail screen UI inside phone; After X-ray: live draining Hourglass Monolith!
-        pre_al = w1 * p_in * (1.0 - 0.88 * xray_p)
-        if pre_al > 0.03:
-            sp_scr1 = get_fitted_text_sprite("قیمت روی فاکتور", fonts.light_22, 200, (185, 185, 198, 255))
-            sp_scr2 = get_fitted_text_sprite("۶۰ میلیون", fonts.bold_44, 210, (255, 255, 255, 255), glow=0.55)
-            sp_scr3 = get_fitted_text_sprite("تومان", fonts.reg_26, 200, (215, 215, 228, 255))
-            stx.append((sp_scr1, 540, 665, pre_al))
-            stx.append((sp_scr2, 540, 738, pre_al))
-            stx.append((sp_scr3, 540, 795, pre_al))
-
-        if xray_p > 0.02:
-            sand_left = clamp(0.82 - 0.52 * clamp((t - t_s1_sec) / max(1.2, t_s2_paper - t_s1_sec)))
-            draw_hourglass_monolith(
-                cs, cg, 540, 755, 148, 285,
-                sand_top=sand_left, flowing=True, t=t, alpha=w1 * xray_p, draw_p=xray_p
-            )
-            # Sweeping X-ray horizontal laser beam inside phone glass
-            scan_y = 535.0 + ((t * 175.0) % 420.0)
-            draw_glow_line(cs, cg, 424, scan_y, 656, scan_y, w1 * xray_p * 0.72, lw_s=1.8, lw_g=5.0)
-
-            # Human silhouette on right (895, 955) whose life-sparks stream into the phone!
-            draw_human_figure(cs, 895, 955, scale=0.92, alpha=w1 * xray_p * 0.92, vortex=True, t=t)
-            draw_human_figure(cg, 895, 955, scale=0.92, alpha=w1 * xray_p * 0.38, lw=4.5)
-            for oi in range(10):
-                ou = ((t * 0.95 + oi / 10.0) % 1.0)
-                # Parabolic arc from human chest (875, 865) -> phone core (540, 755)
-                ox = (1 - ou) ** 2 * 865 + 2 * (1 - ou) * ou * 725 + ou ** 2 * 565
-                oy = (1 - ou) ** 2 * 865 + 2 * (1 - ou) * ou * 645 + ou ** 2 * 755
-                oa = math.sin(math.pi * ou) * w1 * xray_p
-                cs.arc(ox, oy, 3.6, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.95 * oa); cs.fill()
-                cg.arc(ox, oy, 8.5, 0, 2 * 3.14159); cg.set_source_rgba(1, 1, 1, 0.65 * oa); cg.fill()
-
-        # Shockwave burst at "۶۰۰ ساعت از عمرت!"
-        if 0.01 < shock_600 < 0.99:
-            draw_shockwave_ring(cs, cg, 540, 745, shock_600, max_r=410.0, alpha=w1)
-
-        # Bottom 3D Perspective Flip Card (y = 1185): flips from "۶۰ میلیون تومان" -> "۶۰۰ ساعت از عمرت!"
-        ang_f = math.pi * ease_in_out_cubic(flip_raw)
-        sx_card = max(0.08, abs(math.cos(ang_f)))
-        card_w_cur = 780.0 * sx_card
-        is_revealed = (flip_raw >= 0.5)
-        if not is_revealed:
-            p_appear = ease_out_cubic(clamp((t - (t_s1_price - 0.15)) / 0.45))
-            if p_appear > 0.02:
-                draw_safe_card(
-                    cs, cg, stx if sx_card > 0.35 else [], 540, 1185, card_w_cur, 150,
-                    [
-                        ("عددی که روی برچسب می‌بینی:", fonts.reg_26, -34, (190, 190, 202, 255), 0.0),
-                        ("۵۰ تا ۶۰ میلیون تومان", fonts.bold_36, 26, (250, 250, 255, 255), 0.45),
-                    ],
-                    radius=18, pad_x=28, alpha=w1 * p_appear, allow_expand=False
-                )
-        else:
-            draw_safe_card(
-                cs, cg, stx if sx_card > 0.35 else [], 540, 1185, card_w_cur, 165,
-                [
-                    ("قیمتِ واقعی که از وجودت پرداخت کردی:", fonts.reg_26, -38, (220, 220, 232, 255), 0.25),
-                    ("۶۰۰ ساعت از عمرت!", fonts.bold_44, 28, (255, 255, 255, 255), 0.85),
-                ],
-                radius=18, pad_x=28, alpha=w1, glow_border=True, allow_expand=False
-            )
-            draw_star4(cs, 175, 1125, 14.0, w1); draw_star4(cg, 175, 1125, 22.0, w1 * 0.8)
-            draw_star4(cs, 905, 1125, 14.0, w1); draw_star4(cg, 905, 1125, 22.0, w1 * 0.8)
-
-        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cam_z, dx=0.0, dy=cam_dy, px=540.0, py=805.0)
-
-    # =========================================================================
-    # SCENE 2 (t_s2_paper .. t_s3_calc): ASTRONOMICAL SCALE + ECG LIFELINE
-    # =========================================================================
-    w2 = window_fade(t, t_s2_paper - 0.04, t_s3_calc + 0.02, fi=0.26, fo=0.28)
-    if w2 > 0.01:
+    # -------------------------------------------------------------------------
+    # SHOT 07 (b07..b08): Two Characters Exchanging Dissolving Paper Bills!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b07, b08)
+    if w > 0.01:
         stx = []
-        p2 = ease_out_cubic(clamp((t - t_s2_paper) / 0.55))
-        tip_p = ease_in_out_cubic(clamp((t - (t_s2_life - 0.15)) / 0.90))
-        whip_out2 = clamp((t - (t_s3_calc - 0.26)) / 0.28) ** 2 * 0.08
-        cam_z2 = (0.93 + 0.07 * p2
-                  + 0.028 * clamp((t - t_s2_paper) / max(1.0, t_s3_calc - t_s2_paper))
-                  + whip_out2
-                  + impact_punch(t, t_s2_life, amp=0.032, dur=0.60))
-        push_camera(cs, cg, zoom=cam_z2, px=540.0, py=820.0)
+        cz = _shot_cam_z(t, b07, b08, base_in=0.93)
+        push_camera(cs, cg, zoom=cz, px=540, py=840)
+        u7 = clamp((t - b07) / max(0.8, b08 - b07))
+        draw_glow_line(cs, cg, 140, 1085, 940, 1085, w * 0.5, lw_s=1.8, lw_g=3.5)
 
-        draw_pill_badge(cs, cg, stx, "واحدِ واقعیِ معامله: کاغذ یا زندگی؟", 540, 238, fonts.reg_26, w2 * p2)
+        draw_human_figure(cs, 755, 1085, scale=1.55, alpha=w * 0.95); draw_human_figure(cg, 755, 1085, scale=1.55, alpha=w * 0.35, lw=4.5)
+        draw_human_figure(cs, 325, 1085, scale=1.55, alpha=w * 0.55)
+        sp_r = get_fitted_text_sprite("تو", fonts.bold_30, 180, (245, 245, 255, 255))
+        sp_l = get_fitted_text_sprite("فروشنده", fonts.reg_26, 200, (175, 175, 190, 255))
+        stx.append((sp_r, 755, 1138, w)); stx.append((sp_l, 325, 1138, w))
 
-        # Astronomical Fulcrum & Tilting Balance Beam at (540, 585)
-        piv_x, piv_y = 540.0, 585.0
-        tilt_deg = 13.5 * tip_p
-        tilt_rad = math.radians(tilt_deg)
-        arm_len = 280.0
+        # Paper bills flying from right -> left and dissolving into dashed ghost smoke mid-air!
+        for bi in range(4):
+            bu = ((u7 * 1.6 + bi * 0.25) % 1.0)
+            bx = 685.0 - bu * 310.0
+            by = 885.0 - math.sin(math.pi * bu) * 65.0 - bu * 35.0
+            ba = (1.0 - 0.78 * bu) * w
+            cs.save()
+            cs.translate(bx, by); cs.rotate(-bu * 0.5)
+            if bu > 0.45:
+                cs.set_dash([6.0, 6.0])
+            rounded_rect_path(cs, -48, -24, 96, 48, 6)
+            cs.set_source_rgba(1, 1, 1, ba); cs.set_line_width(2.2); cs.stroke()
+            cs.restore()
 
-        lx = piv_x - math.cos(tilt_rad) * arm_len
-        ly = piv_y + math.sin(tilt_rad) * arm_len
-        rx = piv_x + math.cos(tilt_rad) * arm_len
-        ry = piv_y - math.sin(tilt_rad) * arm_len
+        sp_t7 = get_fitted_text_sprite("پول فقط «کاغذِ واسطه» است", fonts.bold_44, 820, (255, 255, 255, 255), glow=0.55)
+        stx.append((sp_t7, 540, 495, w))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=840)
 
-        draw_hypnotic_chronograph_ring(cs, cg, piv_x, piv_y, 165.0, t, alpha=w2 * 0.28, draw_p=p2, speed=0.8)
+    # -------------------------------------------------------------------------
+    # SHOT 08 (b08..b09): X-Ray Dive Inside Human Torso — Heartbeat & Watch!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b08, b09)
+    if w > 0.01:
+        stx = []
+        cz = _shot_cam_z(t, b08, b09, base_in=0.88) + impact_punch(t, tc["c08_life"], 0.038, 0.48)
+        push_camera(cs, cg, zoom=cz, px=540, py=840)
 
-        # Central fulcrum pillar + beam + generous suspension triangles
-        pan_drop = 142.0
-        for ctx, lw, al in ((cs, 2.8, w2 * 0.92), (cg, 5.5, w2 * 0.40)):
+        # Giant upper-body silhouette (head at y=608, chest at y=835) framing the ticking heart-chronograph!
+        draw_human_figure(cs, 540, 1125, scale=3.5, alpha=w * 0.52, lw=2.0)
+        draw_human_figure(cg, 540, 1125, scale=3.5, alpha=w * 0.22, lw=4.5)
+        draw_hypnotic_chronograph_ring(cs, cg, 540, 855, 132.0, t, alpha=w * 0.92, draw_p=1.0, speed=1.8)
+        draw_hourglass_monolith(cs, cg, 540, 855, 76, 132, sand_top=0.48, flowing=True, t=t, alpha=w * 0.96)
+        draw_ecg_waveform(cs, cg, 150, 930, 1215, t, amp=46.0, alpha=w)
+
+        sp_h8 = get_fitted_text_sprite("واحدِ واقعی: ساعتِ زندگیت!", fonts.bold_44, 840, (255, 255, 255, 255), glow=0.7)
+        stx.append((sp_h8, 540, 355, w))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=840)
+
+    # -------------------------------------------------------------------------
+    # SHOT 09 (b09..b10): @ensan.besham Crumbling Life-Pedestal into the Abyss!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b09, b10)
+    if w > 0.01:
+        stx = []
+        cr_u = ease_in_out_cubic(clamp((t - b09) / max(0.7, (b10 - b09) * 0.80)))
+        cz = _shot_cam_z(t, b09, b10, base_in=0.94) + impact_punch(t, b09 + 0.08, 0.042, 0.50)
+        push_camera(cs, cg, zoom=cz, px=540, py=860)
+
+        # Standing base column (drops as top blocks fall off!)
+        rem_top_y = 760.0 + cr_u * 165.0
+        for ctx, lw, al in ((cs, 2.6, w * 0.92), (cg, 5.2, w * 0.36)):
             ctx.save(); ctx.set_dash([])
-            ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw)
-            ctx.move_to(piv_x - 62, 955); ctx.line_to(piv_x + 62, 955); ctx.stroke()
-            ctx.move_to(piv_x, 955); ctx.line_to(piv_x, piv_y); ctx.stroke()
-            ctx.arc(piv_x, piv_y, 9.0, 0, 2 * math.pi); ctx.stroke()
-            ctx.move_to(lx, ly); ctx.line_to(rx, ry); ctx.stroke()
-            # Wide suspension cords so hourglass sits 100% cleanly inside!
-            ctx.set_line_width(1.5)
-            ctx.move_to(lx, ly); ctx.line_to(lx - 86, ly + pan_drop)
-            ctx.move_to(lx, ly); ctx.line_to(lx + 86, ly + pan_drop); ctx.stroke()
-            ctx.move_to(rx, ry); ctx.line_to(rx - 86, ry + pan_drop)
-            ctx.move_to(rx, ry); ctx.line_to(rx + 86, ry + pan_drop); ctx.stroke()
-            # Pans
-            ctx.set_line_width(lw)
-            ctx.move_to(lx - 96, ly + pan_drop)
-            ctx.curve_to(lx - 35, ly + pan_drop + 18, lx + 35, ly + pan_drop + 18, lx + 96, ly + pan_drop); ctx.stroke()
-            ctx.move_to(rx - 96, ry + pan_drop)
-            ctx.curve_to(rx - 35, ry + pan_drop + 18, rx + 35, ry + pan_drop + 18, rx + 96, ry + pan_drop); ctx.stroke()
+            ctx.rectangle(465, rem_top_y, 150, 1320 - rem_top_y)
+            ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw); ctx.stroke()
             ctx.restore()
 
-        # RIGHT PAN (Banknotes dissolving into floating smoke dots — "فقط یه کاغذ واسطه‌ست!")
-        fade_note = 1.0 - 0.45 * tip_p
-        for bi in range(3):
-            bx_n = rx - 50 + bi * 5
-            by_n = ry + pan_drop - 52 - bi * 12
+        # 3 detaching stone life-blocks tumbling down into darkness!
+        for blk_i in range(3):
+            bu = clamp(cr_u * 1.35 - blk_i * 0.18)
+            bx = 540 + (1 if blk_i % 2 == 0 else -1) * (45.0 + bu * 165.0)
+            by = 730.0 + blk_i * 52.0 + (bu ** 2) * 460.0
+            rot_b = (1 if blk_i % 2 == 0 else -1) * bu * 1.45
+            ba = (1.0 - 0.85 * bu) * w
             cs.save(); cs.set_dash([])
-            rounded_rect_path(cs, bx_n, by_n, 96, 44, 6)
-            cs.set_source_rgba(0.04, 0.04, 0.05, 0.9 * w2 * fade_note); cs.fill_preserve()
-            cs.set_source_rgba(1, 1, 1, 0.65 * w2 * fade_note); cs.set_line_width(1.8); cs.stroke()
-            cs.arc(bx_n + 48, by_n + 22, 10, 0, 2 * math.pi); cs.stroke()
+            cs.translate(bx, by); cs.rotate(rot_b)
+            rounded_rect_path(cs, -72, -24, 144, 48, 5)
+            cs.set_source_rgba(1, 1, 1, ba); cs.set_line_width(2.2); cs.stroke()
             cs.restore()
-        for gi in range(7):
-            gu = ((t * 0.8 + gi / 7.0) % 1.0)
-            gx = rx - 35 + (gi * 13) % 70 + math.sin(t * 3.0 + gi) * 8.0
-            gy = ry + pan_drop - 65 - gu * 85.0
-            cs.arc(gx, gy, 2.2, 0, 2 * math.pi)
-            cs.set_source_rgba(1, 1, 1, (1.0 - gu) * 0.55 * w2); cs.fill()
-        sp_r_lbl = get_fitted_text_sprite("پول (کاغذِ واسطه)", fonts.reg_26, 220, (185, 185, 198, 255))
-        stx.append((sp_r_lbl, rx, ry + pan_drop + 46, w2 * p2))
 
-        # LEFT PAN (Heavy Glowing Hourglass sitting cleanly on pan!)
-        sand_s2 = clamp(0.75 - 0.45 * clamp((t - t_s2_paper) / max(1.0, t_s3_calc - t_s2_paper)))
-        draw_hourglass_monolith(
-            cs, cg, lx, ly + pan_drop - 58, 72, 106,
-            sand_top=sand_s2, flowing=True, t=t, alpha=w2 * p2, draw_p=p2
-        )
-        sp_l_lbl = get_fitted_text_sprite("ساعت‌هایِ برنگشتنیِ عمر!", fonts.bold_30, 260, (255, 255, 255, 255), glow=0.6 * tip_p)
-        stx.append((sp_l_lbl, lx, ly + pan_drop + 48, w2 * p2))
+        # Character standing on top of the shrinking pedestal holding phone!
+        draw_character_with_phone(cs, cg, 540, rem_top_y, scale=1.42, raise_p=1.0, screen_glow=0.9, t=t, alpha=w)
+        sp_c9 = get_fitted_text_sprite("ساعت‌هایی که دیگه برنمی‌گردن!", fonts.bold_44, 840, (255, 255, 255, 255), glow=0.75)
+        stx.append((sp_c9, 540, 345, w))
+        sp_col = get_fitted_text_sprite("ستونِ عمر", fonts.reg_30, 140, (200, 200, 215, 255))
+        stx.append((sp_col, 540, 1145, w * 0.85))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=860)
 
-        if 0.02 < tip_p < 0.95:
-            draw_shockwave_ring(cs, cg, lx, ly + pan_drop - 45, tip_p, max_r=180.0, alpha=w2 * 0.7)
-
-        # Bottom Live Scrolling Human Heartbeat ECG Box (540, 1185, w=860, h=205)
-        draw_safe_card(
-            cs, cg, stx, 540, 1185, 860, 205,
-            [
-                ("ضربانِ عمر: تنها سرمایه‌ای که هیچ بانکی دوباره چاپش نمی‌کنه!", fonts.reg_26, 66, (235, 235, 245, 255), 0.35),
-            ],
-            radius=18, pad_x=30, alpha=w2 * p2, glow_border=(tip_p > 0.3), allow_expand=False
-        )
-        draw_ecg_waveform(cs, cg, 155, 925, 1152, t, amp=42.0, alpha=w2 * p2)
-
-        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cam_z2, px=540.0, py=820.0)
-
-    # =========================================================================
-    # SCENE 3 (t_s3_calc .. t_s4_lens): HUD CALCULATOR + 75-DAY DOMINO MATRIX!
-    # =========================================================================
-    w3 = window_fade(t, t_s3_calc - 0.04, t_s4_lens + 0.02, fi=0.26, fo=0.28)
-    if w3 > 0.01:
+    # -------------------------------------------------------------------------
+    # SHOT 10 (b10..b11): Hunched Office Worker at Laptop + Fast Spinning Clock!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b10, b11)
+    if w > 0.01:
         stx = []
-        p3 = ease_out_cubic(clamp((t - t_s3_calc) / 0.55))
-        rate_p = ease_out_cubic(clamp((t - (t_s3_rate - 0.25)) / 0.65))
-        dom_u = clamp((t - (t_s3_rate + 0.15)) / max(0.75, (t_s3_75d + 0.45) - (t_s3_rate + 0.15)))
-        seas_p = ease_out_cubic(clamp((t - (t_s3_season - 0.15)) / 0.55))
-        whip_out3 = clamp((t - (t_s4_lens - 0.26)) / 0.28) ** 2 * 0.08
+        cz = _shot_cam_z(t, b10, b11, base_in=0.92)
+        push_camera(cs, cg, zoom=cz, px=540, py=840)
 
-        cam_z3 = (0.93 + 0.07 * p3
-                  + 0.025 * dom_u + whip_out3
-                  + impact_punch(t, t_s3_season, amp=0.036, dur=0.60))
-        push_camera(cs, cg, zoom=cam_z3, px=540.0, py=835.0)
+        # Fast-spinning office wall clock overhead (speed=6.5x!)
+        draw_hypnotic_chronograph_ring(cs, cg, 540, 465, 115.0, t, alpha=w * 0.92, draw_p=1.0, speed=6.5)
+        draw_character_at_desk(cs, cg, 540, 1055, scale=1.95, t=t, alpha=w)
 
-        draw_pill_badge(cs, cg, stx, "فرمولِ واقعی: تبدیلِ قیمت به روزهای زندگی", 540, 238, fonts.reg_26, w3 * p3)
+        sp_w10 = get_fitted_text_sprite("کار + ترافیک + خستگیِ روزانه", fonts.bold_36, 820, (245, 245, 255, 255), glow=0.45)
+        stx.append((sp_w10, 540, 1165, w))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=840)
 
-        # Live rolling hours counter (0 -> 600)
-        cur_hrs = int(round(600 * ease_out_cubic(clamp((t - t_s3_calc) / max(0.8, t_s3_75d - t_s3_calc)))))
-        hrs_fa = str(cur_hrs).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
+    # -------------------------------------------------------------------------
+    # SHOT 11 (b11..b12): @ensan.besham v03_4M Payslip + Giant «۱۰۰,۰۰۰» + Worker!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b11, b12)
+    if w > 0.01:
+        stx = []
+        cz = _shot_cam_z(t, b11, b12, base_in=0.90) + impact_punch(t, b11 + 0.08, 0.042, 0.45)
+        push_camera(cs, cg, zoom=cz, px=540, py=830)
 
-        draw_safe_card(
-            cs, cg, stx, 540, 435, 860, 195,
-            [
-                ("گوشیِ ۶۰ میلیونی  ÷  ساعتی ۱۰۰ هزار تومن درآمدِ خالص", fonts.reg_26, -42, (205, 205, 218, 255), 0.15 * rate_p),
-                (f"=  {hrs_fa} ساعت کارِ خالص از عمرت!", fonts.bold_44, 34, (255, 255, 255, 255), 0.75),
-            ],
-            radius=18, pad_x=30, alpha=w3 * p3, glow_border=True, allow_expand=False
-        )
+        # Clean Payslip document icon at top (540, 395)
+        cs.save(); cs.set_dash([])
+        rounded_rect_path(cs, 445, 285, 190, 210, 12)
+        cs.set_source_rgba(1, 1, 1, 0.88 * w); cs.set_line_width(2.3); cs.stroke()
+        for ly_p in (335, 368, 401, 434):
+            cs.move_to(475, ly_p); cs.line_to(605, ly_p); cs.set_source_rgba(1, 1, 1, 0.45 * w); cs.set_line_width(1.6); cs.stroke()
+        cs.restore()
+        sp_ps = get_fitted_text_sprite("فیشِ ۱ ساعت عمر", fonts.light_22, 170, (215, 215, 228, 255))
+        stx.append((sp_ps, 540, 308, w))
 
-        # 75-DAY CALENDAR DOMINO MATRIX (15 cols x 5 rows = 75 full 8-hour workdays!)
-        # Enclosed inside an architectural calendar frame (540, 865, w=860, h=520)
-        draw_safe_card(
-            cs, cg, stx, 540, 865, 860, 520,
-            [
-                ("تقویمِ عمرت: ۷۵ روزِ کاملِ کاری (هر خانه = ۱ روزِ زندگی)", fonts.reg_26, -212, (215, 215, 228, 255), 0.2),
-                ("۷۵ روز کامل کاری  =  بیشتر از ۳ ماه زندگیت!", fonts.bold_30, 212, (255, 255, 255, 255), 0.65 * dom_u),
-            ],
-            radius=18, pad_x=30, alpha=w3 * p3, glow_border=(dom_u > 0.85), allow_expand=False
-        )
+        # Giant ExtraBold 100,000 center focal!
+        sp_100 = get_fitted_text_sprite("۱۰۰,۰۰۰", fonts.eb_92, 820, (255, 255, 255, 255), glow=0.90)
+        sp_tom = get_fitted_text_sprite("تومان در هر ساعت", fonts.bold_36, 700, (220, 220, 235, 255))
+        stx.append((sp_100, 540, 625, w))
+        stx.append((sp_tom, 540, 725, w))
 
+        draw_human_figure(cs, 540, 1155, scale=1.55, alpha=w * 0.95)
+        draw_human_figure(cg, 540, 1155, scale=1.55, alpha=w * 0.35, lw=4.5)
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=830)
+
+    # -------------------------------------------------------------------------
+    # SHOT 12 (b12..b13): Rear Flagship Pro iPhone = Spinning 0->600 Odometer!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b12, b13)
+    if w > 0.01:
+        stx = []
+        cz = _shot_cam_z(t, b12, b13, base_in=0.91)
+        push_camera(cs, cg, zoom=cz, px=540, py=820)
+        u12 = ease_out_cubic(clamp((t - b12) / max(0.5, (b13 - b12) * 0.85)))
+
+        draw_pro_rear_iphone(cs, cg, 735, 760, 210, 390, alpha=w, draw_p=1.0)
+        sp_eq = get_fitted_text_sprite("=", fonts.eb_84, 120, (255, 255, 255, 255), glow=0.6)
+        stx.append((sp_eq, 535, 760, w))
+
+        cur_h = int(round(600 * u12))
+        h_fa = str(cur_h).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
+        sp_cnt = get_fitted_text_sprite(h_fa, fonts.eb_92, 340, (255, 255, 255, 255), glow=0.90)
+        sp_unit = get_fitted_text_sprite("ساعت کار!", fonts.bold_36, 320, (220, 220, 235, 255))
+        stx.append((sp_cnt, 315, 730, w))
+        stx.append((sp_unit, 315, 830, w))
+        sp_p60 = get_fitted_text_sprite("گوشیِ ۶۰ میلیونی", fonts.bold_30, 320, (215, 215, 228, 255))
+        stx.append((sp_p60, 735, 1015, w))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=820)
+
+    # -------------------------------------------------------------------------
+    # SHOT 13 (b13..b14): Giant «۷۵ روز کاری» + 75-Cell Domino Wall + Tiny Human!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b13, b14)
+    if w > 0.01:
+        stx = []
+        cz = _shot_cam_z(t, b13, b14, base_in=0.90) + impact_punch(t, b13 + 0.08, 0.04, 0.45)
+        push_camera(cs, cg, zoom=cz, px=540, py=830)
+        dom_u = clamp((t - b13) / max(0.65, (b14 - b13) * 0.72))
+
+        sp_75 = get_fitted_text_sprite("۷۵ روزِ کاملِ کاری!", fonts.eb_84, 860, (255, 255, 255, 255), glow=0.92)
+        stx.append((sp_75, 540, 355, w))
+
+        # 15 x 5 crisp calendar blocks towering like a monolith above a tiny human!
         cols, rows = 15, 5
-        cell_w, cell_h = 42.0, 52.0
-        gap_x, gap_y = 11.0, 14.0
-        grid_w = cols * cell_w + (cols - 1) * gap_x
-        grid_h = rows * cell_h + (rows - 1) * gap_y
-        gx0 = 540.0 - grid_w / 2.0
-        gy0 = 865.0 - grid_h / 2.0 + 4.0
-
-        lit_float = dom_u * 75.0
-        cs.save(); cg.save()
-        cs.set_dash([]); cg.set_dash([])
-        for r_i in range(rows):
-            for c_i in range(cols):
-                # RTL progression (right-to-left across each week row!)
-                idx_d = r_i * cols + (cols - 1 - c_i)
-                cx_d = gx0 + c_i * (cell_w + gap_x)
-                cy_d = gy0 + r_i * (cell_h + gap_y)
-                cell_act = clamp(lit_float - idx_d)
-                is_crest = (0.01 < cell_act < 0.99) or (0.0 <= (lit_float - idx_d) < 2.2 and dom_u < 0.99)
-
-                rounded_rect_path(cs, cx_d, cy_d, cell_w, cell_h, 7.0)
-                if cell_act > 0.02:
-                    cs.set_source_rgba(1, 1, 1, (0.20 + 0.58 * cell_act) * w3)
-                    cs.fill_preserve()
-                    cs.set_source_rgba(1, 1, 1, 0.95 * w3)
-                    cs.set_line_width(1.9)
-                    cs.stroke()
-                    if is_crest:
-                        rounded_rect_path(cg, cx_d - 2, cy_d - 2, cell_w + 4, cell_h + 4, 8.0)
-                        cg.set_source_rgba(1, 1, 1, 0.85 * w3)
-                        cg.set_line_width(4.5)
-                        cg.stroke()
+        cw_c, ch_c, gx_c, gy_c = 44.0, 56.0, 11.0, 14.0
+        gw = cols * cw_c + (cols - 1) * gx_c
+        x_start = 540.0 - gw / 2.0
+        y_start = 475.0
+        lit_f = dom_u * 75.0
+        cs.save(); cg.save(); cs.set_dash([]); cg.set_dash([])
+        for ri in range(rows):
+            for ci in range(cols):
+                idx_d = ri * cols + (cols - 1 - ci)
+                cx_d = x_start + ci * (cw_c + gx_c)
+                cy_d = y_start + ri * (ch_c + gy_c)
+                act = clamp(lit_f - idx_d)
+                rounded_rect_path(cs, cx_d, cy_d, cw_c, ch_c, 7.0)
+                if act > 0.02:
+                    cs.set_source_rgba(1, 1, 1, (0.25 + 0.62 * act) * w); cs.fill_preserve()
+                    cs.set_source_rgba(1, 1, 1, 0.96 * w); cs.set_line_width(1.9); cs.stroke()
+                    if 0.01 < act < 0.99:
+                        rounded_rect_path(cg, cx_d - 2, cy_d - 2, cw_c + 4, ch_c + 4, 8.0)
+                        cg.set_source_rgba(1, 1, 1, 0.88 * w); cg.set_line_width(4.5); cg.stroke()
                 else:
-                    cs.set_source_rgba(1, 1, 1, 0.16 * w3 * p3)
-                    cs.set_line_width(1.2)
-                    cs.stroke()
+                    cs.set_source_rgba(1, 1, 1, 0.16 * w); cs.set_line_width(1.2); cs.stroke()
         cs.restore(); cg.restore()
 
-        if seas_p > 0.04:
-            if seas_p < 0.92:
-                draw_shockwave_ring(cs, cg, 540, 1235, seas_p, max_r=280.0, alpha=w3 * 0.75)
-            draw_pill_badge(
-                cs, cg, stx, "یعنی کلِ یه فصل از جوونیت پایِ یه گوشی رفت!",
-                540, 1235, fonts.bold_30, w3 * seas_p, glow=True
-            )
+        # Tiny human figure at bottom looking up at the giant 75-day wall!
+        draw_character_with_phone(cs, cg, 540, 1215, scale=1.18, raise_p=0.85, screen_glow=0.8, t=t, alpha=w)
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=830)
 
-        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cam_z3, px=540.0, py=835.0)
-
-    # =========================================================================
-    # SCENE 4 (t_s4_lens .. t_s5_wheel): EVERYDAY X-RAY LIFE-TAG SCANNER
-    # =========================================================================
-    w4 = window_fade(t, t_s4_lens - 0.04, t_s5_wheel + 0.02, fi=0.26, fo=0.28)
-    if w4 > 0.01:
+    # -------------------------------------------------------------------------
+    # SHOT 14 (b14..b15): Poetic Season Cut — Canopy of Youth Blowing Away!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b14, b15)
+    if w > 0.01:
         stx = []
-        p4 = ease_out_cubic(clamp((t - t_s4_lens) / 0.55))
-        u4 = clamp((t - t_s4_lens) / max(1.2, t_s5_wheel - t_s4_lens))
-        whip_out4 = clamp((t - (t_s5_wheel - 0.26)) / 0.28) ** 2 * 0.08
-        cam_z4 = 0.93 + 0.07 * p4 + 0.025 * u4 + whip_out4
-        push_camera(cs, cg, zoom=cam_z4, px=540.0, py=805.0)
+        cz = _shot_cam_z(t, b14, b15, base_in=0.93)
+        push_camera(cs, cg, zoom=cz, px=540, py=840)
+        u14 = clamp((t - b14) / max(0.6, b15 - b14))
 
-        draw_pill_badge(cs, cg, stx, "عینکِ «ساعتِ عمر» روی خریدهای روزمره", 540, 238, fonts.reg_26, w4 * p4)
+        sp_s14 = get_fitted_text_sprite("۱ فصلِ کامل از جوونیت!", fonts.eb_68, 860, (255, 255, 255, 255), glow=0.88)
+        stx.append((sp_s14, 540, 395, w))
 
-        rows_data = [
-            ("shoe",   500.0, "کفشِ ۶ میلیونی",           "۶۰ ساعت کارِ خالص!",   clamp((t - (t_s4_shoe - 0.45)) / 0.50)),
-            ("dinner", 755.0, "شامِ پرزرق‌وبرقِ ۲ میلیونی", "۲۰ ساعت از آزادیت!",   clamp((t - (t_s4_din - 0.45)) / 0.50)),
-            ("phone", 1010.0, "ارتقای نمایشیِ گوشی",      "۷۵ روز حبسِ کاری!",    clamp((t - (t_s4_din + 0.15)) / 0.55)),
-        ]
+        draw_glow_line(cs, cg, 140, 1145, 940, 1145, w * 0.45, lw_s=1.8, lw_g=3.5)
+        draw_character_with_phone(cs, cg, 330, 1145, scale=1.65, raise_p=1.0, screen_glow=1.0, t=t, alpha=w)
 
-        # Smooth X-ray horizontal scanline sweeping down across the 3 everyday cards
-        beam_y = 390.0 + ease_in_out_cubic(clamp(u4 * 1.12)) * 735.0
-
-        for idx_r, (ic_kind, ry_c, title_r, real_tag, rev_u) in enumerate(rows_data):
-            rp = ease_out_cubic(clamp((t - (t_s4_lens + idx_r * 0.22)) / 0.55))
-            act_r = ease_out_cubic(max(rev_u, clamp((beam_y - (ry_c - 65.0)) / 120.0)))
-            if rp <= 0.02:
-                continue
-
-            # Outer row card (w=860, h=195)
-            cs.save(); cg.save(); cs.set_dash([]); cg.set_dash([])
-            rounded_rect_path(cs, 540 - 430, ry_c - 96, 860, 192, 18)
-            cs.set_source_rgba(0.035, 0.035, 0.048, 0.92 * w4 * rp); cs.fill_preserve()
-            cs.set_source_rgba(1, 1, 1, (0.28 + 0.62 * act_r) * w4 * rp); cs.set_line_width(2.2); cs.stroke()
-            if act_r > 0.25:
-                rounded_rect_path(cg, 540 - 430, ry_c - 96, 860, 192, 18)
-                cg.set_source_rgba(1, 1, 1, 0.36 * act_r * w4); cg.set_line_width(4.4); cg.stroke()
-            cs.restore(); cg.restore()
-
-            # Right side: bespoke animated icon (x=885) + title centered in right zone (x=665)
-            draw_mini_everyday_icon(cs, cg, ic_kind, 888, ry_c, t, alpha=w4 * rp, active=act_r)
-            sp_rt = get_fitted_text_sprite(title_r, fonts.bold_30, 310, (238, 238, 248, 255))
-            stx.append((sp_rt, 655, ry_c, w4 * rp))
-
-            # Left side (x=285): X-Ray revealed Life-Hours Pill Badge!
-            draw_safe_card(
-                cs, cg, stx, 285, ry_c, 310, 108,
-                [
-                    ("قیمت به عمر:", fonts.light_22, -24, (195, 195, 208, 255), 0.0),
-                    (real_tag, fonts.bold_30, 22, (255, 255, 255, 255), 0.72 * act_r),
-                ],
-                radius=14, pad_x=22, alpha=w4 * rp * (0.28 + 0.72 * act_r),
-                glow_border=(act_r > 0.35), allow_expand=False
-            )
-
-        # Glowing X-ray laser line + side reticles
-        if 395.0 < beam_y < 1120.0:
-            draw_glow_line(cs, cg, 92, beam_y, 988, beam_y, w4 * 0.82, lw_s=2.0, lw_g=5.8)
-            cs.arc(92, beam_y, 4.5, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.95 * w4); cs.fill()
-            cs.arc(988, beam_y, 4.5, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.95 * w4); cs.fill()
-
-        draw_pill_badge(cs, cg, stx, "هر خرید = تکه‌ای از آزادیت که معامله می‌کنی!", 540, 1225, fonts.reg_26, w4 * p4, glow=True)
-        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cam_z4, px=540.0, py=805.0)
-
-    # =========================================================================
-    # SCENE 5 (t_s5_wheel .. t_s6_rule): GIANT CLOCKWORK WHEEL + RUNNING HUMAN!
-    # =========================================================================
-    w5 = window_fade(t, t_s5_wheel - 0.04, t_s6_rule + 0.02, fi=0.26, fo=0.28)
-    if w5 > 0.01:
-        stx = []
-        p5 = ease_out_cubic(clamp((t - t_s5_wheel) / 0.55))
-        own_p = ease_out_cubic(clamp((t - (t_s5_own - 0.25)) / 0.65))
-        u5 = clamp((t - t_s5_wheel) / max(1.2, t_s6_rule - t_s5_wheel))
-        whip_out5 = clamp((t - (t_s6_rule - 0.26)) / 0.28) ** 2 * 0.08
-
-        cam_z5 = (0.93 + 0.07 * p5 + 0.038 * u5 + whip_out5
-                  + impact_punch(t, t_s5_own, amp=0.036, dur=0.65))
-        push_camera(cs, cg, zoom=cam_z5, px=540.0, py=775.0)
-
-        draw_pill_badge(cs, cg, stx, "تله‌ی چشم‌وهم‌چشمی: چرخ‌دنده‌ی بی‌پایان", 540, 238, fonts.reg_26, w5 * p5)
-
-        # Giant Meshing Clockwork Wheel at (540, 725, r=265) + Secondary upper-right gear!
-        w_cx, w_cy, w_r = 540.0, 725.0, 265.0
-        rot_main = t * 0.62
-        draw_clock_gear(cs, cg, 815, 495, 92.0, 12, -rot_main * (24.0 / 12.0) + 0.18, alpha=w5 * p5 * 0.48, glow=False)
-        draw_clock_gear(cs, cg, w_cx, w_cy, w_r, 24, rot_main, alpha=w5 * p5, glow=True)
-        draw_hypnotic_chronograph_ring(cs, cg, w_cx, w_cy, w_r * 0.78, t, alpha=w5 * p5 * 0.55, draw_p=p5, speed=2.2)
-
-        # Articulated 60fps Human Running cleanly on the inner rim track of the spinning Clock-Wheel!
-        wrist_pt = draw_running_human_60fps(cs, cg, 575, w_cy + w_r * 0.61, scale=1.08, t=t, alpha=w5 * p5, facing_left=True)
-
-        # Dangling Glowing Smartphone ahead on left rim (325, 685) + Glowing Clock-Chain tether to wrist!
-        ph_x, ph_y = 335.0, 675.0 + math.sin(t * 3.2) * 8.0
-        draw_flagship_phone(cs, cg, ph_x, ph_y, 76, 138, alpha=w5 * p5, draw_p=p5, glow=True)
-
-        if wrist_pt is not None:
-            wx, wy = wrist_pt
-            # Taut glowing chain of 9 oval links from smartphone to runner's wrist!
-            n_links = 9
-            cs.save(); cg.save(); cs.set_dash([]); cg.set_dash([])
-            for li in range(n_links + 1):
-                lu = li / n_links
-                lx_c = ph_x + 36 + (wx - (ph_x + 36)) * lu
-                ly_c = ph_y + 10 + (wy - (ph_y + 10)) * lu + math.sin(math.pi * lu) * 18.0
-                cs.arc(lx_c, ly_c, 4.8, 0, 2 * math.pi)
-                cs.set_source_rgba(1, 1, 1, (0.55 + 0.42 * own_p) * w5); cs.set_line_width(2.0); cs.stroke()
-                if own_p > 0.1:
-                    cg.arc(lx_c, ly_c, 7.5, 0, 2 * math.pi)
-                    cg.set_source_rgba(1, 1, 1, 0.48 * own_p * w5); cg.fill()
-            cs.restore(); cg.restore()
-
-        # Peeling calendar pages flying off behind the runner into darkness!
-        for pg_i in range(5):
-            pu = ((t * 0.72 + pg_i / 5.0) % 1.0)
-            px_p = 640.0 + pu * 240.0
-            py_p = 835.0 - pu * 135.0 + math.sin(pu * 6.0 + pg_i) * 16.0
-            pa = math.sin(math.pi * pu) * 0.75 * w5 * p5
-            cs.save(); cs.set_dash([])
-            cs.translate(px_p, py_p)
-            cs.rotate(pu * 1.1 + pg_i * 0.4)
-            rounded_rect_path(cs, -16, -20, 32, 40, 4)
-            cs.set_source_rgba(1, 1, 1, pa); cs.set_line_width(1.6); cs.stroke()
-            cs.move_to(-16, -10); cs.line_to(16, -10); cs.stroke()
+        # 22 glowing calendar/leaf particles blowing away from the character into the wind!
+        for li in range(22):
+            lu = ((u14 * 0.85 + (li * 0.043)) % 1.0)
+            lx_p = 390.0 + lu * 560.0
+            ly_p = 945.0 - lu * 280.0 + math.sin(lu * 7.0 + li) * 38.0
+            la = math.sin(math.pi * lu) * w * 0.90
+            cs.save(); cs.translate(lx_p, ly_p); cs.rotate(lu * 2.4 + li)
+            cs.move_to(-11, 0); cs.curve_to(-4, -8, 4, -8, 11, 0); cs.curve_to(4, 8, -4, 8, -11, 0)
+            cs.set_source_rgba(1, 1, 1, la); cs.set_line_width(1.8); cs.stroke()
             cs.restore()
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=840)
 
-        # Bottom punchline card (540, 1185, w=860, h=180)
-        draw_safe_card(
-            cs, cg, stx, 540, 1185, 860, 180,
-            [
-                ("دیگه تو صاحبِ وسایلت نیستی؛", fonts.reg_26, -38, (205, 205, 218, 255), 0.15),
-                ("اون وسایل صاحبِ عمر و زندگیِ توئن!", fonts.bold_36, 30, (255, 255, 255, 255), 0.82 * max(0.35, own_p)),
-            ],
-            radius=18, pad_x=30, alpha=w5 * p5, glow_border=(own_p > 0.2), allow_expand=False
-        )
-
-        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cam_z5, px=540.0, py=775.0)
-
-    # =========================================================================
-    # SCENE 6 (t_s6_rule .. t_s7_cta): 3-SECOND LIBERATION FILTER & CHAIN BREAK!
-    # =========================================================================
-    w6 = window_fade(t, t_s6_rule - 0.04, t_s7_cta + 0.02, fi=0.26, fo=0.28)
-    if w6 > 0.01:
+    # -------------------------------------------------------------------------
+    # SHOT 15 (b15..b16): Close-Up Character Head Snapping on X-Ray Glasses!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b15, b16)
+    if w > 0.01:
         stx = []
-        p6 = ease_out_cubic(clamp((t - t_s6_rule) / 0.55))
-        free_p = ease_out_cubic(clamp((t - (t_s6_worth - 0.15)) / 0.65))
-        shat_u = clamp((t - (t_s6_worth - 0.08)) / 0.85) if t >= (t_s6_worth - 0.08) else 0.0
-        whip_out6 = clamp((t - (t_s7_cta - 0.26)) / 0.28) ** 2 * 0.08
+        cz = _shot_cam_z(t, b15, b16, base_in=0.86) + impact_punch(t, b15 + 0.05, 0.038, 0.38)
+        push_camera(cs, cg, zoom=cz, px=540, py=840)
+        gp = ease_out_cubic(clamp((t - b15) / 0.40))
 
-        cam_z6 = (0.93 + 0.07 * p6 + whip_out6
-                  + impact_punch(t, t_s6_worth, amp=0.036, dur=0.60))
-        push_camera(cs, cg, zoom=cam_z6, px=540.0, py=805.0)
+        # Large portrait of character + glowing geometric X-ray lenses snapping onto eyes!
+        draw_human_figure(cs, 540, 1245, scale=3.1, alpha=w * 0.92)
+        draw_human_figure(cg, 540, 1245, scale=3.1, alpha=w * 0.35, lw=4.5)
+        hx_c, hy_c = 540.0, 1245.0 - 148.0 * 3.1  # y = 786.2
+        slide_y = (1.0 - gp) * -90.0
+        for ctx, lw, al in ((cs, 3.0, w * gp), (cg, 6.5, w * gp * 0.65)):
+            ctx.save(); ctx.set_dash([])
+            rounded_rect_path(ctx, hx_c - 64, hy_c - 20 + slide_y, 56, 36, 8)
+            rounded_rect_path(ctx, hx_c + 8,  hy_c - 20 + slide_y, 56, 36, 8)
+            ctx.move_to(hx_c - 8, hy_c - 2 + slide_y); ctx.line_to(hx_c + 8, hy_c - 2 + slide_y)
+            ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw); ctx.stroke()
+            ctx.restore()
+        if gp > 0.5:
+            draw_spotlight_cone(cs, cg, hx_c, hy_c, 220, 860, 360, alpha=w * (gp - 0.5) * 1.4)
+        sp_g15 = get_fitted_text_sprite("عینکِ «قیمت به ساعتِ عمر»", fonts.bold_44, 820, (255, 255, 255, 255), glow=0.7)
+        stx.append((sp_g15, 540, 395, w * gp))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=840)
 
-        draw_pill_badge(cs, cg, stx, "پادزهرِ ۳ ثانیه‌ای قبل از کشیدنِ کارت", 540, 238, fonts.reg_26, w6 * p6)
-
-        draw_safe_card(
-            cs, cg, stx, 540, 405, 860, 130,
-            [
-                ("قیمتِ جنس  ÷  درآمدِ ۱ ساعتت  =  چند ساعت از عمرم؟", fonts.bold_30, 0, (250, 250, 255, 255), 0.45),
-            ],
-            radius=16, pad_x=28, alpha=w6 * p6, glow_border=False, allow_expand=False
-        )
-
-        # Right Portal: Impulse Object (dims when chain shatters!)
-        dim_imp = 1.0 - 0.58 * free_p
-        draw_safe_card(
-            cs, cg, stx, 765, 785, 345, 415,
-            [
-                ("گزینه‌ی اول", fonts.light_22, -145, (180, 180, 192, 255), 0.0),
-                ("خریدِ هیجانی", fonts.bold_36, -60, (215, 215, 225, 255), 0.0),
-                ("ذوقِ ۲ روزه", fonts.reg_26, 35, (175, 175, 188, 255), 0.0),
-                ("و ماه‌ها اضافه‌کاری!", fonts.light_22, 120, (165, 165, 178, 255), 0.0),
-            ],
-            radius=18, pad_x=26, alpha=w6 * p6 * dim_imp, allow_expand=False
-        )
-
-        # Left Portal: Your Free Life-Days (illuminates with OLED halo + human standing free!)
-        draw_safe_card(
-            cs, cg, stx, 315, 785, 355, 415,
-            [
-                ("گزینه‌ی دوم", fonts.light_22, -145, (220, 220, 235, 255), 0.2 * free_p),
-                ("نگه داشتنِ عمرت!", fonts.bold_36, -82, (255, 255, 255, 255), 0.8 * free_p),
-                ("آرامش و آزادیِ واقعی", fonts.reg_26, 145, (245, 245, 252, 255), 0.45 * free_p),
-            ],
-            radius=18, pad_x=26, alpha=w6 * p6, glow_border=(free_p > 0.15), allow_expand=False
-        )
-        draw_human_figure(cs, 315, 868, scale=0.72, alpha=w6 * p6 * (0.45 + 0.55 * free_p), star_mind=(free_p > 0.2))
-        draw_human_figure(cg, 315, 868, scale=0.72, alpha=w6 * p6 * 0.38 * free_p, lw=4.5, star_mind=(free_p > 0.2))
-        if free_p > 0.15:
-            draw_star4(cs, 180, 625, 14 * free_p, w6); draw_star4(cg, 180, 625, 22 * free_p, w6 * 0.8)
-            draw_star4(cs, 450, 625, 14 * free_p, w6); draw_star4(cg, 450, 625, 22 * free_p, w6 * 0.8)
-
-        # Center chain shatter + cursor click choosing Freedom!
-        if 0.01 < shat_u < 0.99:
-            draw_shockwave_ring(cs, cg, 540, 785, shat_u, max_r=260.0, alpha=w6)
-            for bi in range(16):
-                ang_b = bi * (2 * math.pi / 16.0) + 0.2
-                rr_b = 18.0 + ease_out_cubic(shat_u) * 145.0
-                bx_b = 540 + math.cos(ang_b) * rr_b
-                by_b = 785 + math.sin(ang_b) * rr_b
-                ba = (1.0 - shat_u) * w6
-                cs.arc(bx_b, by_b, 3.4, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, ba); cs.fill()
-                cg.arc(bx_b, by_b, 7.0, 0, 2 * math.pi); cg.set_source_rgba(1, 1, 1, ba * 0.6); cg.fill()
-
-        cur_u6 = ease_in_out_cubic(clamp((t - (t_s6_rule + 0.4)) / max(0.6, (t_s6_worth - t_s6_rule))))
-        cx6 = 740.0 + (335.0 - 740.0) * cur_u6
-        cy6 = 825.0 - math.sin(math.pi * cur_u6) * 48.0
-        draw_cursor_pointer(cs, cg, cx6, cy6, click_p=shat_u, alpha=w6 * p6, scale=1.12)
-
-        draw_pill_badge(
-            cs, cg, stx, "اگه به اون‌همه زندگی نمی‌ارزه، نخر و آزاد بمون!",
-            540, 1175, fonts.bold_30, w6 * max(0.35, free_p), glow=True
-        )
-        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cam_z6, px=540.0, py=805.0)
-
-    # =========================================================================
-    # SCENE 7 (t_s7_cta .. outro_t0): INTERACTIVE 3-CHOICE COMMENT TRIGGER!
-    # =========================================================================
-    w7 = window_fade(t, t_s7_cta - 0.10, outro_t0 + 0.10, fi=0.35, fo=0.42)
-    if w7 > 0.01:
+    # -------------------------------------------------------------------------
+    # SHOT 16 (b16..b17): Sneaker Showcase -> Giant «۶۰ ساعت» + Treadmill Runner!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b16, b17)
+    if w > 0.01:
         stx = []
-        p7 = ease_out_cubic(clamp((t - t_s7_cta) / 0.55))
-        cam_z7 = 0.98 + 0.025 * p7
-        push_camera(cs, cg, zoom=cam_z7, px=540.0, py=805.0)
+        t_60h = tc["c16_60h"]
+        rev = ease_out_cubic(clamp((t - (t_60h - 0.12)) / 0.38))
+        cz = _shot_cam_z(t, b16, b17, base_in=0.91) + impact_punch(t, t_60h, 0.042, 0.42)
+        push_camera(cs, cg, zoom=cz, px=540, py=820)
 
-        draw_pill_badge(cs, cg, stx, "همین الان گوشیِ توی دستت رو حساب کن!", 540, 245, fonts.reg_26, w7 * p7)
+        # Large minimalist Sneaker icon at top (540, 445)
+        for ctx, lw, al in ((cs, 3.0, w * 0.95), (cg, 6.2, w * 0.45)):
+            ctx.save(); ctx.set_dash([]); ctx.translate(540, 445); ctx.scale(2.3, 2.3)
+            ctx.move_to(-44, 20); ctx.line_to(44, 20)
+            ctx.curve_to(46, 5, 30, 1, 12, -5); ctx.line_to(-6, -24); ctx.line_to(-26, -19); ctx.line_to(-40, 4)
+            ctx.close_path(); ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw / 2.3); ctx.stroke()
+            ctx.move_to(-44, 12); ctx.line_to(43, 12); ctx.stroke()
+            ctx.restore()
 
-        opts = [
-            (495.0, "۱.  کمتر از ۱ ماه از عمرم پاش رفته"),
-            (690.0, "۲.  بین ۱ تا ۳ ماهِ کامل براش کار کردم"),
-            (885.0, "۳.  بیشتر از ۳ ماه از عمرم پاش رفته!"),
+        if rev < 0.25:
+            sp_sh1 = get_fitted_text_sprite("کفشِ ۶,۰۰۰,۰۰۰ تومانی؟", fonts.bold_52, 820, (240, 240, 250, 255))
+            stx.append((sp_sh1, 540, 690, w))
+        else:
+            sp_sh2 = get_fitted_text_sprite("۶۰ ساعت", fonts.eb_92, 820, (255, 255, 255, 255), glow=0.92)
+            sp_sh3 = get_fitted_text_sprite("پایِ کار موندن!", fonts.bold_44, 720, (230, 230, 245, 255))
+            stx.append((sp_sh2, 540, 665, w * rev))
+            stx.append((sp_sh3, 540, 775, w * rev))
+            draw_running_human_60fps(cs, cg, 540, 1135, scale=1.45, t=t, alpha=w * rev, facing_left=True)
+            draw_glow_line(cs, cg, 360, 1142, 720, 1142, w * rev * 0.85, lw_s=3.0, lw_g=6.0)
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=820)
+
+    # -------------------------------------------------------------------------
+    # SHOT 17 (b17..b18): Silver Cloche Lifting -> Giant «۲۰ ساعت آزادی»!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b17, b18)
+    if w > 0.01:
+        stx = []
+        t_20h = tc["c17_20h"]
+        lift_u = ease_out_cubic(clamp((t - (b17 + 0.25)) / 0.70))
+        rev20 = ease_out_cubic(clamp((t - (t_20h - 0.12)) / 0.38))
+        cz = _shot_cam_z(t, b17, b18, base_in=0.91) + impact_punch(t, t_20h, 0.042, 0.42)
+        push_camera(cs, cg, zoom=cz, px=540, py=820)
+
+        # Platter at y=535 + Cloche dome lifting upward by 135px to reveal spinning clock!
+        draw_glow_line(cs, cg, 350, 545, 730, 545, w * 0.9, lw_s=3.0, lw_g=6.0)
+        dome_y = 538.0 - lift_u * 145.0
+        for ctx, lw, al in ((cs, 2.8, w * 0.94), (cg, 6.0, w * 0.42)):
+            ctx.save(); ctx.set_dash([])
+            ctx.arc(540, dome_y, 135.0, math.pi, 2 * math.pi); ctx.close_path()
+            ctx.set_source_rgba(1, 1, 1, al); ctx.set_line_width(lw); ctx.stroke()
+            ctx.arc(540, dome_y - 145.0, 12.0, 0, 2 * math.pi); ctx.stroke()
+            ctx.restore()
+
+        if lift_u > 0.25:
+            draw_hypnotic_chronograph_ring(cs, cg, 540, 480, 62.0, t, alpha=w * lift_u, draw_p=1.0, speed=3.0)
+
+        if rev20 < 0.20:
+            sp_d1 = get_fitted_text_sprite("شامِ ۲,۰۰۰,۰۰۰ تومانی؟", fonts.bold_52, 820, (240, 240, 250, 255))
+            stx.append((sp_d1, 540, 745, w))
+        else:
+            sp_d2 = get_fitted_text_sprite("۲۰ ساعت", fonts.eb_92, 820, (255, 255, 255, 255), glow=0.92)
+            sp_d3 = get_fitted_text_sprite("از آزادیِ خالصت!", fonts.bold_44, 760, (235, 235, 248, 255))
+            stx.append((sp_d2, 540, 735, w * rev20))
+            stx.append((sp_d3, 540, 845, w * rev20))
+            draw_human_figure(cs, 540, 1185, scale=1.35, alpha=w * rev20 * 0.90)
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=820)
+
+    # -------------------------------------------------------------------------
+    # SHOT 18 (b18..b19): @ensan.besham Social Comparison Pedestals (چشم‌وهم‌چشمی)!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b18, b19)
+    if w > 0.01:
+        stx = []
+        cz = _shot_cam_z(t, b18, b19, base_in=0.92)
+        push_camera(cs, cg, zoom=cz, px=540, py=840)
+        u18 = ease_out_cubic(clamp((t - b18) / 0.75))
+
+        draw_glow_line(cs, cg, 120, 1185, 960, 1185, w * 0.5, lw_s=1.8, lw_g=3.5)
+        # Left & Right tall rival pedestals ("رفیقت", "بغل‌دستی") holding bright phones!
+        for px_r, lbl_r, ph_h in ((255.0, "بغل‌دستی", 330.0 * u18), (825.0, "همکار", 285.0 * u18)):
+            cs.save(); cs.set_dash([])
+            cs.rectangle(px_r - 58, 1185 - ph_h, 116, ph_h)
+            cs.set_source_rgba(1, 1, 1, 0.55 * w); cs.set_line_width(2.0); cs.stroke()
+            cs.restore()
+            draw_character_with_phone(cs, cg, px_r, 1185 - ph_h, scale=1.18, raise_p=1.0, screen_glow=1.0, t=t, alpha=w * 0.88)
+            sp_rl = get_fitted_text_sprite(lbl_r, fonts.reg_26, 180, (185, 185, 200, 255))
+            stx.append((sp_rl, px_r, 1230, w))
+
+        # Center lower pedestal: "تو" looking up enviously along dashed sightlines!
+        cs.save(); cs.set_dash([])
+        cs.rectangle(540 - 62, 1185 - 110, 124, 110)
+        cs.set_source_rgba(1, 1, 1, 0.90 * w); cs.set_line_width(2.4); cs.stroke()
+        cs.set_dash([6.0, 6.0], -t * 24.0)
+        cs.move_to(540, 910); cs.line_to(255, 710); cs.move_to(540, 910); cs.line_to(825, 755)
+        cs.set_source_rgba(1, 1, 1, 0.42 * w); cs.set_line_width(1.6); cs.stroke()
+        cs.restore()
+        draw_human_figure(cs, 540, 1075, scale=1.28, alpha=w * 0.98)
+        draw_human_figure(cg, 540, 1075, scale=1.28, alpha=w * 0.38, lw=4.5)
+        sp_tu18 = get_fitted_text_sprite("تو (تله‌ی مقایسه)", fonts.bold_30, 260, (255, 255, 255, 255), glow=0.5)
+        stx.append((sp_tu18, 540, 1230, w))
+        sp_top18 = get_fitted_text_sprite("خرید برای چشم‌وهم‌چشمی!", fonts.bold_44, 840, (255, 255, 255, 255), glow=0.65)
+        stx.append((sp_top18, 540, 365, w))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=840)
+
+    # -------------------------------------------------------------------------
+    # SHOT 19 (b19..b20): Sisyphus Character Crushed Under Giant Boulder-Phone!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b19, b20)
+    if w > 0.01:
+        stx = []
+        cz = _shot_cam_z(t, b19, b20, base_in=0.90) + impact_punch(t, b19 + 0.05, 0.038, 0.42)
+        push_camera(cs, cg, zoom=cz, px=540, py=850)
+
+        draw_sisyphus_human_boulder_phone(cs, cg, 515, 1125, scale=1.32, t=t, alpha=w)
+        sp_s19 = get_fitted_text_sprite("دیگه تو صاحبِ وسایلت نیستی...", fonts.bold_44, 860, (255, 255, 255, 255), glow=0.75)
+        stx.append((sp_s19, 540, 385, w))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=850)
+
+    # -------------------------------------------------------------------------
+    # SHOT 20 (b20..b21): Puppet-Master Phone Above Holding Human on Strings!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b20, b21)
+    if w > 0.01:
+        stx = []
+        shk20 = math.sin((t - b20) * 44.0) * 8.0 * math.exp(-max(0.0, t - b20) * 7.0) if t >= b20 else 0.0
+        cz = _shot_cam_z(t, b20, b21, base_in=0.88) + impact_punch(t, tc["c20_puppet"], 0.052, 0.55)
+        push_camera(cs, cg, zoom=cz, dx=shk20, px=540, py=830)
+
+        draw_shockwave_ring(cs, cg, 540, 455, clamp((t - b20) / 0.72), max_r=400.0, alpha=w)
+
+        # Giant rotating clockwork gear + horizontal Master Smartphone at top (540, 445)
+        draw_clock_gear(cs, cg, 540, 445, 175.0, 20, t * 0.75, alpha=w * 0.55)
+        cs.save(); cg.save(); cs.set_dash([]); cg.set_dash([])
+        rounded_rect_path(cs, 540 - 165, 445 - 82, 330, 164, 26)
+        cs.set_source_rgba(0.03, 0.03, 0.04, 0.96 * w); cs.fill_preserve()
+        cs.set_source_rgba(1, 1, 1, 0.98 * w); cs.set_line_width(3.2); cs.stroke()
+        rounded_rect_path(cg, 540 - 165, 445 - 82, 330, 164, 26)
+        cg.set_source_rgba(1, 1, 1, 0.65 * w); cg.set_line_width(7.0); cg.stroke()
+        cs.restore(); cg.restore()
+        sp_pm = get_fitted_text_sprite("اربابِ زمانِ تو", fonts.bold_36, 290, (255, 255, 255, 255), glow=0.7)
+        stx.append((sp_pm, 540, 445, w))
+
+        # Puppet human dangling below at (540, 1135) with 4 glowing marionette strings!
+        sway = math.sin(t * 3.2) * 14.0
+        hx_p = 540.0 + sway
+        draw_human_figure(cs, hx_p, 1135, scale=1.75, alpha=w * 0.96)
+        draw_human_figure(cg, hx_p, 1135, scale=1.75, alpha=w * 0.40, lw=4.5)
+        for sx_top, tx_bot, ty_bot in (
+            (430, hx_p - 68, 1135 - 105),
+            (495, hx_p,      1135 - 260),
+            (585, hx_p,      1135 - 205),
+            (650, hx_p + 68, 1135 - 105),
+        ):
+            draw_glow_line(cs, cg, sx_top, 527, tx_bot, ty_bot, w * 0.82, lw_s=1.8, lw_g=4.2)
+
+        sp_own = get_fitted_text_sprite("وسایلت صاحبِ عمرِ توئن!", fonts.bold_44, 860, (255, 255, 255, 255), glow=0.85)
+        stx.append((sp_own, 540, 1230, w))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, dx=shk20, px=540, py=830)
+
+    # -------------------------------------------------------------------------
+    # SHOT 21 (b21..b22): POV Hand Checkout Pause — Price ÷ 1 Hour of Life!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b21, b22)
+    if w > 0.01:
+        stx = []
+        cz = _shot_cam_z(t, b21, b22, base_in=0.91)
+        push_camera(cs, cg, zoom=cz, px=540, py=830)
+
+        draw_pov_phone_in_hand(cs, cg, 540, 835, 345, 625, thumb_swipe=0.0, thumb_tap=0.0, alpha=w, draw_p=1.0)
+        sp_f1 = get_fitted_text_sprite("قانونِ ۳ ثانیه:", fonts.reg_26, 275, (195, 195, 210, 255))
+        sp_f2 = get_fitted_text_sprite("قیمتِ جنس", fonts.bold_44, 275, (255, 255, 255, 255), glow=0.5)
+        sp_f3 = get_fitted_text_sprite("÷ درآمدِ ۱ ساعتت", fonts.bold_30, 275, (235, 235, 248, 255))
+        sp_f4 = get_fitted_text_sprite("= چند ساعت عمر؟", fonts.bold_30, 275, (255, 255, 255, 255), glow=0.75)
+        stx.append((sp_f1, 540, 608, w))
+        stx.append((sp_f2, 540, 682, w))
+        stx.append((sp_f3, 540, 756, w))
+        stx.append((sp_f4, 540, 828, w))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=830)
+
+    # -------------------------------------------------------------------------
+    # SHOT 22 (b22..b23): LIBERATION! Character Lowers Phone & Shatters Chains!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b22, b23)
+    if w > 0.01:
+        stx = []
+        shat_u = clamp((t - b22) / 0.85)
+        drop_u = ease_in_out_cubic(clamp((t - b22) / 0.75))
+        cz = _shot_cam_z(t, b22, b23, base_in=0.90) + impact_punch(t, tc["c22_free"], 0.048, 0.55)
+        push_camera(cs, cg, zoom=cz, px=540, py=830)
+
+        draw_shockwave_ring(cs, cg, 540, 860, shat_u, max_r=430.0, alpha=w)
+        # Character lowers the phone arm (raise_p: 1.0 -> 0.0!) as star_mind ignites inside head!
+        draw_character_with_phone(
+            cs, cg, 540, 1135, scale=1.95, raise_p=(1.0 - drop_u), screen_glow=(1.0 - drop_u),
+            t=t, alpha=w, star_mind=(drop_u > 0.35)
+        )
+        # 24 shattered chain shards rising into free fireflies!
+        for si in range(24):
+            ang_s = si * (2 * math.pi / 24.0) + 0.15
+            rad_s = 45.0 + ease_out_cubic(shat_u) * 320.0
+            sx = 540.0 + math.cos(ang_s) * rad_s
+            sy = 910.0 + math.sin(ang_s) * rad_s - shat_u * 85.0
+            sa = (1.0 - 0.55 * shat_u) * w
+            draw_star4(cs, sx, sy, 6.5, sa)
+            draw_star4(cg, sx, sy, 11.0, sa * 0.7)
+
+        sp_fr = get_fitted_text_sprite("عمرت رو مفت نفروش؛ آزاد بمون!", fonts.bold_44, 860, (255, 255, 255, 255), glow=0.85)
+        stx.append((sp_fr, 540, 385, w * drop_u))
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=830)
+
+    # -------------------------------------------------------------------------
+    # SHOT 23 (b23..b24): Meta Mirror Shot — Character + 3 Rising Choice Pillars!
+    # -------------------------------------------------------------------------
+    w = _shot_win(t, b23, b24, fo=0.32)
+    if w > 0.01:
+        stx = []
+        p23 = ease_out_cubic(clamp((t - b23) / 0.55))
+        cz = 0.94 + 0.06 * p23 + 0.02 * clamp((t - b23) / max(1.0, b24 - b23))
+        push_camera(cs, cg, zoom=cz, px=540, py=830)
+
+        sp_q23 = get_fitted_text_sprite("گوشیِ توی دستت = چند ماه از عمرت؟", fonts.bold_36, 860, (255, 255, 255, 255), glow=0.65)
+        stx.append((sp_q23, 540, 275, w * p23))
+
+        # 3 @ensan.besham vertical choice pedestals rising side-by-side!
+        cyc = ((t - b23) * 1.65) % 3.0
+        pillars = [
+            (840.0, 210.0, "۱", "زیرِ ۱ ماه",   0),
+            (540.0, 320.0, "۲", "۱ تا ۳ ماه",   1),
+            (240.0, 440.0, "۳", "بالای ۳ ماه!", 2),
         ]
-        cyc = ((t - t_s7_cta) * 1.45) % 3.0
-        for oi, (oy, otxt) in enumerate(opts):
-            op = ease_out_cubic(clamp((t - (t_s7_cta + oi * 0.16)) / 0.45))
-            hi = math.exp(-((cyc - oi) ** 2) / 0.30)
-            if op > 0.02:
-                draw_safe_card(
-                    cs, cg, stx, 540, oy, 850, 138,
-                    [(otxt, fonts.bold_30, 0, (255, 255, 255, 255), 0.30 + 0.55 * hi)],
-                    radius=18, pad_x=32, alpha=w7 * op, glow_border=(hi > 0.50), allow_expand=False
-                )
+        base_y23 = 1065.0
+        draw_glow_line(cs, cg, 110, base_y23, 970, base_y23, w * 0.5, lw_s=1.8, lw_g=3.5)
+        for px_c, ph_full, num_c, lbl_c, idx_c in pillars:
+            hi = math.exp(-((cyc - idx_c) ** 2) / 0.28)
+            ph_cur = ph_full * ease_out_cubic(clamp((t - (b23 + idx_c * 0.14)) / 0.50))
+            cs.save(); cg.save(); cs.set_dash([]); cg.set_dash([])
+            rounded_rect_path(cs, px_c - 105, base_y23 - ph_cur, 210, max(12.0, ph_cur), 14)
+            cs.set_source_rgba(0.035, 0.035, 0.05, 0.92 * w); cs.fill_preserve()
+            cs.set_source_rgba(1, 1, 1, (0.42 + 0.56 * hi) * w); cs.set_line_width(2.4); cs.stroke()
+            if hi > 0.45:
+                rounded_rect_path(cg, px_c - 105, base_y23 - ph_cur, 210, max(12.0, ph_cur), 14)
+                cg.set_source_rgba(1, 1, 1, 0.55 * hi * w); cg.set_line_width(5.5); cg.stroke()
+            cs.restore(); cg.restore()
 
-        # Gliding cursor inviting viewer tap
-        cur_y7 = 495.0 + ease_in_out_cubic(clamp(((t - t_s7_cta) % 2.4) / 2.0)) * 390.0
-        draw_cursor_pointer(cs, cg, 175, cur_y7 + 18, click_p=0.0, alpha=w7 * p7 * 0.85, scale=1.05)
+            if idx_c == 1:
+                draw_character_with_phone(cs, cg, px_c, base_y23 - ph_cur, scale=0.98, raise_p=1.0, screen_glow=1.0, t=t, alpha=w * p23)
 
-        draw_pill_badge(cs, cg, stx, "عددش رو توی کامنت بنویس: ۱، ۲ یا ۳؟", 540, 1145, fonts.bold_30, w7 * p7, glow=True)
-        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cam_z7, px=540.0, py=805.0)
+            sp_nc = get_fitted_text_sprite(num_c, fonts.eb_68, 170, (255, 255, 255, 255), glow=0.8 * hi)
+            sp_lc = get_fitted_text_sprite(lbl_c, fonts.bold_30, 185, (230, 230, 245, 255))
+            stx.append((sp_nc, px_c, base_y23 - ph_cur * 0.55 - 16, w * p23))
+            stx.append((sp_lc, px_c, base_y23 + 44, w * p23))
 
-    # =========================================================================
-    # SCENE 8 (outro_t0 .. total_dur): SIGNATURE OLED ENDPLATE (@zavieh.penhann)
-    # =========================================================================
-    w9 = window_fade(t, outro_t0 - 0.15, total_dur + 0.5, fi=0.45, fo=0.55)
+        draw_pill_badge(cs, cg, stx, "عددش رو همین الان تو کامنت بنویس: ۱، ۲ یا ۳؟", 540, 1225, fonts.bold_30, w * p23, glow=True)
+        pop_camera_and_transform_texts(cs, cg, stx, txts, zoom=cz, px=540, py=830)
+
+    # -------------------------------------------------------------------------
+    # SHOT 24 (b24..total_dur): SIGNATURE OLED ENDPLATE (@zavieh.penhann)
+    # -------------------------------------------------------------------------
+    w9 = window_fade(t, outro_t0 - 0.12, total_dur + 0.5, fi=0.40, fo=0.55)
     if w9 > 0.01:
         lt = max(0.0, t - outro_t0)
         p_logo = ease_out_cubic(clamp(lt / 1.05))
-
         cx, cy = 540.0, 725.0
-        # Hypnotic timepiece halo gently framing the signature Mind-Aperture!
-        draw_hypnotic_chronograph_ring(cs, cg, cx, cy, 228.0, t, alpha=w9 * p_logo * 0.36, draw_p=p_logo, speed=0.65)
+        draw_hypnotic_chronograph_ring(cs, cg, cx, cy, 228.0, t, alpha=w9 * p_logo * 0.38, draw_p=p_logo, speed=0.65)
 
         cs.save(); cs.set_dash([])
         cs.arc(cx, cy, 152, 0, 2 * math.pi * p_logo)
@@ -926,7 +1075,7 @@ def render_scene_frame(
 
 
 # =============================================================================
-# Multiprocessing 60fps Cloud Renderer + Automated 12-Panel QA Sheets
+# Multiprocessing 60fps Cloud Renderer + Automated 12 & 24-Shot QA Sheets
 # =============================================================================
 _W_FONTS = None
 _W_SG = None
@@ -953,7 +1102,7 @@ def _worker_render_frame(frame_idx: int) -> bytes:
 
 
 def save_qa_sheets(font_dir: str, meta: dict, qa_dir: str):
-    """Generates automated subtitle baseline QA strip + 12-panel full-episode storyboard."""
+    """Generates subtitle baseline QA strip + 24-shot full contact sheet + 12-hero-shot sheet."""
     os.makedirs(qa_dir, exist_ok=True)
     fonts = FontBank(font_dir)
     sg = cairo.ImageSurface(cairo.FORMAT_ARGB32, W, H)
@@ -961,9 +1110,9 @@ def save_qa_sheets(font_dir: str, meta: dict, qa_dir: str):
     ss = cairo.ImageSurface(cairo.FORMAT_ARGB32, W, H)
     cs = cairo.Context(ss)
 
-    # 1. Subtitle Baseline Stability & Liquid Wipe Strip (14 frames across 75-day reveal!)
+    # 1. Subtitle Baseline Stability & Liquid Wipe Strip
     sub_strip = Image.new("RGB", (920, 14 * 105), (0, 0, 0))
-    test_ln = meta["sub_lines"][min(15, len(meta["sub_lines"]) - 1)]
+    test_ln = meta["sub_lines"][min(5, len(meta["sub_lines"]) - 1)]
     t0_s = test_ln["times"][0]
     for k in range(14):
         tk = t0_s + k * 0.09
@@ -976,32 +1125,46 @@ def save_qa_sheets(font_dir: str, meta: dict, qa_dir: str):
         sub_strip.paste(crop, (0, k * 105))
     sub_strip.save(os.path.join(qa_dir, "subtitle_strip_verify.png"))
 
-    # 2. 12-Scene Full Storyboard Sheet across all 8 scenes & transitions
     tc = meta["t_cues"]
     td = meta["total_dur"]
-    sample_ts = [
-        tc["s1_price"] + 0.35,                  # P1: Retail smartphone price screen + chronograph halo
-        tc["s1_secret"] + 0.90,                 # P2: X-ray hourglass inside phone + human life-sparks!
-        tc["s1_600"] + 0.55,                    # P3: 3D-flipped "۶۰۰ ساعت از عمرت!" + shockwave
-        tc["s2_life"] + 0.95,                   # P4: Astronomical Balance Scale + live PQRST ECG lifeline
-        tc["s3_rate"] + 0.65,                   # P5: HUD Calculator + Domino Calendar igniting mid-wave!
-        tc["s3_season"] + 0.50,                 # P6: Full 75-day matrix lit + "کل یه فصل از جوونیت!"
-        tc["s4_shoe"] + 0.25,                   # P7: X-ray laser sweeping mid-way across Everyday tags
-        0.5 * (tc["s4_din"] + tc["s5_wheel"]),  # P8: All 3 Everyday Life-Tags illuminated cleanly!
-        tc["s5_own"] + 0.55,                    # P9: Giant Clockwork Gear Wheel + Running Human + Tethered Phone!
-        tc["s6_worth"] + 0.30,                  # P10: 3-Second Filter + Chain Shatter Burst + Freedom Portal!
-        tc["s7_cta"] + 1.15,                    # P11: Interactive 1 / 2 / 3 Self-Calculation CTA
-        td - 1.5,                               # P12: Signature OLED Endplate (@zavieh.penhann)
+    outro_t0 = td - 4.0
+
+    # All 24 shots sampled cleanly at the midpoint of each shot!
+    bounds = [
+        0.0, tc["c02_pov"], tc["c03_p50"], tc["c04_eye"], tc["c05_slash"],
+        tc["c06_600"] - 0.12, tc["c07_paper"], tc["c08_chest"], tc["c09_crumble"] - 0.10,
+        tc["c10_desk"], tc["c11_100k"] - 0.10, tc["c12_iphone"], tc["c13_75d"] - 0.10,
+        tc["c14_season"], tc["c15_glasses"], tc["c16_shoe"], tc["c17_dinner"],
+        tc["c18_envy"], tc["c19_boulder"], tc["c20_puppet"] - 0.10,
+        tc["c21_filter"], tc["c22_free"] - 0.10, tc["c23_cta"], outro_t0, td
     ]
-    pw, ph = 360, 640
-    grid = Image.new("RGB", (pw * 4, ph * 3), (18, 18, 22))
-    for idx_p, ts in enumerate(sample_ts):
-        ts_c = max(0.05, min(td - 0.05, ts))
+    ts_24 = [0.5 * (bounds[i] + bounds[i + 1]) for i in range(24)]
+    # Nudge Shot 16 & 17 slightly toward second half so revealed 60h & 20h show up!
+    ts_24[2]  = tc["c03_p60"] + 0.35
+    ts_24[15] = tc["c16_60h"] + 0.35
+    ts_24[16] = tc["c17_20h"] + 0.35
+
+    pw24, ph24 = 270, 480
+    grid24 = Image.new("RGB", (pw24 * 6, ph24 * 4), (16, 16, 20))
+    for i, ts in enumerate(ts_24):
+        ts_c = max(0.08, min(td - 0.12, ts))
         raw = render_scene_frame(ts_c, td, tc, meta["sub_lines"], fonts, sg, cg, ss, cs)
-        im = Image.frombytes("RGB", (W, H), raw).resize((pw, ph), Image.Resampling.LANCZOS)
+        im = Image.frombytes("RGB", (W, H), raw).resize((pw24, ph24), Image.Resampling.LANCZOS)
+        r, c = divmod(i, 6)
+        grid24.paste(im, (c * pw24, r * ph24))
+    grid24.save(os.path.join(qa_dir, "storyboard_24_shots.png"))
+
+    # Also save standard 12-panel highlight storyboard for release compatibility
+    pick_12 = [0, 2, 5, 8, 9, 12, 15, 17, 18, 19, 21, 22]
+    pw12, ph12 = 360, 640
+    grid12 = Image.new("RGB", (pw12 * 4, ph12 * 3), (18, 18, 22))
+    for idx_p, s_i in enumerate(pick_12):
+        ts_c = max(0.08, min(td - 0.12, ts_24[s_i]))
+        raw = render_scene_frame(ts_c, td, tc, meta["sub_lines"], fonts, sg, cg, ss, cs)
+        im = Image.frombytes("RGB", (W, H), raw).resize((pw12, ph12), Image.Resampling.LANCZOS)
         r, c = divmod(idx_p, 4)
-        grid.paste(im, (c * pw, r * ph))
-    grid.save(os.path.join(qa_dir, "storyboard_12_scenes.png"))
+        grid12.paste(im, (c * pw12, r * ph12))
+    grid12.save(os.path.join(qa_dir, "storyboard_12_scenes.png"))
 
 
 def run_cloud_render(font_dir: str, work_dir: str, out_mp4: str, qa_dir: str, whisper_size: str = "medium"):
@@ -1010,7 +1173,7 @@ def run_cloud_render(font_dir: str, work_dir: str, out_mp4: str, qa_dir: str, wh
     os.makedirs(qa_dir, exist_ok=True)
     os.makedirs(os.path.dirname(os.path.abspath(out_mp4)), exist_ok=True)
 
-    print("=== [1/3] Building Studio v3.0 Master Audio (Locked Rasalgethi + Hypnotic D-Minor Horology Score) ===", flush=True)
+    print("=== [1/3] Building Studio v4.0 Master Audio (Locked Rasalgethi + 38 Hyper-Foley SFX + D-Minor Score) ===", flush=True)
     meta = build_episode_audio(
         segments=SCRIPT_SEGMENTS,
         sfx_cue_map=SFX_CUE_MAP,
@@ -1023,7 +1186,7 @@ def run_cloud_render(font_dir: str, work_dir: str, out_mp4: str, qa_dir: str, wh
     total_dur = meta["total_dur"]
     total_frames = int(round(total_dur * FPS))
     workers = max(1, mp.cpu_count())
-    print(f"=== [2/3] Rendering {total_frames} frames @ {W}x{H} {FPS}fps on {workers} CPU cores (CRF 14) ===", flush=True)
+    print(f"=== [2/3] Rendering {total_frames} frames (24 Rapid Shots) @ {W}x{H} {FPS}fps on {workers} CPU cores (CRF 14) ===", flush=True)
 
     ff_cmd = [
         "ffmpeg", "-y",
@@ -1055,7 +1218,7 @@ def run_cloud_render(font_dir: str, work_dir: str, out_mp4: str, qa_dir: str, wh
     if rc != 0:
         raise RuntimeError(f"FFmpeg exited with code {rc}")
 
-    print("=== [3/3] Generating QA Verification Sheets & Alignment Report ===", flush=True)
+    print("=== [3/3] Generating 24-Shot & 12-Scene QA Verification Sheets ===", flush=True)
     save_qa_sheets(font_dir, meta, qa_dir)
     subprocess.check_call(["cp", meta["align_json"], os.path.join(qa_dir, "alignment.json")])
     sz_mb = os.path.getsize(out_mp4) / (1024 * 1024)
