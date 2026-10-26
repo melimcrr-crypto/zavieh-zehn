@@ -1020,9 +1020,9 @@ def render_scene_frame(
     # =========================================================================
     # SHOT 24 (b24..total_dur): Signature @zavieh.penhann Brand Endplate
     # =========================================================================
-    w9 = window_fade(t, outro_t0 - 0.12, total_dur + 0.5, fi=0.40, fo=0.55)
+    w9 = window_fade(t, b24, total_dur + 0.5, fi=0.36, fo=0.55)
     if w9 > 0.01:
-        lt = max(0.0, t - outro_t0)
+        lt = max(0.0, t - b24)
         p_logo = ease_out_cubic(clamp(lt / 1.05))
         cx, cy = 540.0, 725.0
         draw_hypnotic_chronograph_ring(cs, cg, cx, cy, 228.0, t, alpha=w9 * p_logo * 0.38, draw_p=p_logo, speed=0.65)

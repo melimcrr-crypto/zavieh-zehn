@@ -291,8 +291,8 @@ def align_script_lines(tightened_wav: str, script_lines: list[str], whisper_size
         nc = _norm_fa(w.word)
         if not nc:
             continue
-        w_s = float(w.start)
-        w_e = max(w_s + 0.04, float(w.end))
+        w_s = min(float(w.start), max(0.05, acoustic_t1 - 0.05))
+        w_e = max(w_s + 0.04, min(float(w.end), acoustic_t1 + 0.06))
         dt = (w_e - w_s) / len(nc)
         for k, ch in enumerate(nc):
             w_chars.append(ch)
@@ -316,7 +316,7 @@ def align_script_lines(tightened_wav: str, script_lines: list[str], whisper_size
     N_s, N_w = max(1, len(s_chars)), len(w_chars)
 
     t_first = min(acoustic_t0, w_t0[0]) if N_w > 0 else acoustic_t0
-    t_last  = max(acoustic_t1, w_t1[-1]) if N_w > 0 else acoustic_t1
+    t_last  = acoustic_t1
     avg_spc = max(0.035, (t_last - t_first) / N_s)
 
     # Direct continuous time-boundary anchors (eliminates step-function timestamp collapse on Whisper dropouts!)
@@ -368,7 +368,7 @@ def align_script_lines(tightened_wav: str, script_lines: list[str], whisper_size
                 t_ends[k] = round(t_starts[k] + 0.06, 3)
 
         l_start = round(max(0.0, t_starts[0] - 0.08), 3)
-        l_end   = round(max(l_start + 0.35, t_ends[-1] + 0.18), 3)
+        l_end   = round(min(acoustic_t1 + 0.14, max(l_start + 0.35, t_ends[-1] + 0.16)), 3)
         aligned_lines.append({
             "full": lm["full"],
             "start": l_start,
