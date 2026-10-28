@@ -820,6 +820,42 @@ def build_master_stereo_mix(tightened_wav: str, out_master_wav: str, sfx_events:
             sfx_L[idx:idx+dn] += sig * 1.08
             sfx_R[idx:idx+dn] += sig * 0.92
 
+        elif kind == "cash_rustle":
+            # Crisp paper banknote counting flicks (3 rapid crisp paper snaps)
+            for b_off, g_b in ((0.0, 1.0), (0.085, 0.85), (0.165, 0.72)):
+                bi = idx + int(b_off * SR)
+                if bi < N - 2400:
+                    bd = min(int(0.085 * SR), N - bi)
+                    bt = np.arange(bd, dtype=np.float32) / SR
+                    nz = rng_s.standard_normal(bd).astype(np.float32)
+                    pap = lfilter(*butter(2, [1300.0/(SR/2), 5200.0/(SR/2)], btype="band"), nz) * np.exp(-bt * 46.0)
+                    thk = np.sin(2 * np.pi * 240.0 * bt) * np.exp(-bt * 65.0) * 0.35
+                    bsig = (pap * 0.85 + thk) * 0.145 * g_b
+                    sfx_L[bi:bi+bd] += bsig * 1.06
+                    sfx_R[bi:bi+bd] += bsig * 0.94
+
+        elif kind == "pos_beep":
+            # Authentic contactless POS terminal payment confirm double-chirp (A6 -> E7)
+            for p_off, pf in ((0.0, 1760.0), (0.095, 2637.0)):
+                pi = idx + int(p_off * SR)
+                if pi < N - 2000:
+                    pd = min(int(0.085 * SR), N - pi)
+                    pt = np.arange(pd, dtype=np.float32) / SR
+                    psig = np.sin(2 * np.pi * pf * pt) * np.exp(-pt * 34.0) * np.clip(pt / 0.004, 0, 1) * 0.115
+                    sfx_L[pi:pi+pd] += psig * 0.92
+                    sfx_R[pi:pi+pd] += psig * 1.08
+
+        elif kind == "syringe_hiss":
+            # Subtle clinical anesthesia micro-injection psst + sub-bass numbing drop
+            dn = min(int(0.32 * SR), N - idx)
+            tt = np.arange(dn, dtype=np.float32) / SR
+            nz = rng_s.standard_normal(dn).astype(np.float32)
+            hiss = lfilter(*butter(2, [2200.0/(SR/2), 6200.0/(SR/2)], btype="band"), nz) * np.exp(-tt * 14.0)
+            drop = np.sin(2 * np.pi * (165.0 - 95.0 * tt) * tt) * np.exp(-tt * 11.0)
+            sig = (0.48 * hiss + 0.65 * drop) * 0.135
+            sfx_L[idx:idx+dn] += sig * 1.04
+            sfx_R[idx:idx+dn] += sig * 0.96
+
         elif kind == "stamp":
             dn = min(int(0.20 * SR), N - idx)
             tt = np.arange(dn, dtype=np.float32) / SR

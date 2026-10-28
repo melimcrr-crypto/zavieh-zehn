@@ -6,6 +6,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 W, H = 1080, 1920
 FPS = 60
 SAFE_MARGIN_X = 64.0  # Strict horizontal screen safe-zone [64 .. 1016]
+SUBTITLE_BASELINE_Y = 1520.0  # 400px above bottom (clears Instagram @username + Follow + caption UI!)
+CHAPTER_DOTS_Y = 1432.0       # Cleanly above subtitle & below scene floor (y <= 1315)
 
 FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 def fa(s) -> str:
@@ -292,10 +294,10 @@ def render_liquid_rtl_subtitle(canvas: Image.Image, t: float, sub_lines: list[di
 
     sub_im = Image.fromarray(blended.astype(np.uint8), mode="RGBA")
 
-    # Constant fixed typographical baseline at y = 1642 (with subtle 4px upward float on entrance)
+    # Constant fixed typographical baseline at SUBTITLE_BASELINE_Y = 1520.0 (clears Instagram @username UI!)
     y_glide = (1.0 - ease_out_cubic(fi)) * 4.5
     paste_x = int(round(W / 2.0 - entry["tw"] / 2.0))
-    paste_y = int(round(1642.0 - entry["baseline_offset"] + y_glide))
+    paste_y = int(round(SUBTITLE_BASELINE_Y - entry["baseline_offset"] + y_glide))
     canvas.alpha_composite(sub_im, (paste_x, paste_y))
 
 
@@ -1286,21 +1288,32 @@ def draw_hud_chrome(
         return
 
     # Exact @ensan.besham angled پرونده tab at top right + rotating AI/Observatory eye at top left
+    sp_lbl = get_text_sprite("پرونده", fonts.light_22, (145, 145, 158, 255))
+    sp_val = get_fitted_text_sprite(fa(ep_title), fonts.bold_30, 560, (245, 245, 250, 255), glow=0.35)
+    lbl_vis_w = max(40.0, sp_lbl.width - 64.0)
+    val_vis_w = max(60.0, sp_val.width - 64.0)
+    lbl_cx = 1006.0 - lbl_vis_w * 0.5
+    div_x  = lbl_cx - lbl_vis_w * 0.5 - 14.0
+    val_cx = div_x - 14.0 - val_vis_w * 0.5
+    tab_left = min(690.0, val_cx - val_vis_w * 0.5 - 22.0)
+
     cs.save()
     cs.set_dash([])
-    cs.set_source_rgba(1, 1, 1, 0.14 * hud_alpha)
+    cs.set_source_rgba(1, 1, 1, 0.16 * hud_alpha)
     cs.set_line_width(1.2)
     cs.move_to(70, 128)
-    cs.line_to(665, 128)
-    cs.line_to(690, 102)
-    cs.line_to(1010, 102)
+    cs.line_to(tab_left - 25.0, 128)
+    cs.line_to(tab_left, 104)
+    cs.line_to(1010, 104)
+    cs.stroke()
+    cs.move_to(div_x, 66)
+    cs.line_to(div_x, 86)
+    cs.set_source_rgba(1, 1, 1, 0.28 * hud_alpha)
     cs.stroke()
     cs.restore()
 
-    sp_lbl = get_text_sprite("پرونده", fonts.light_22, (135, 135, 145, 255))
-    sp_val = get_text_sprite(fa(ep_title), fonts.bold_30, (245, 245, 250, 255), glow=0.35)
-    text_overlays.append((sp_lbl, 962, 76, hud_alpha * 0.85))
-    text_overlays.append((sp_val, 805, 76, hud_alpha * 0.95))
+    text_overlays.append((sp_lbl, lbl_cx, 76, hud_alpha * 0.85))
+    text_overlays.append((sp_val, val_cx, 76, hud_alpha * 0.95))
 
     # Top-left Observatory Dual Counter-Rotating Dotted Rings + Mind Angle
     ax, ay = 128, 92
@@ -1323,7 +1336,7 @@ def draw_hud_chrome(
     draw_star4(cg, ax + 9, ay + 4, 9.0, hud_alpha * 0.8)
     cs.restore()
 
-    # Bottom Chapter Progress Dots at y = 1538 (exact @ensan.besham spacing!)
+    # Bottom Chapter Progress Dots at CHAPTER_DOTS_Y = 1432 (clears raised y=1520 subtitle!)
     n_ch = len(chapter_starts)
     cur_ch = 0
     for ci, cs_t in enumerate(chapter_starts):
@@ -1333,7 +1346,7 @@ def draw_hud_chrome(
     right_x = 540.0 + (n_ch - 1) * dot_gap / 2.0
     for ci in range(n_ch):
         dx = right_x - ci * dot_gap
-        dy = 1538.0
+        dy = CHAPTER_DOTS_Y
         if ci == cur_ch:
             cs.arc(dx, dy, 4.6, 0, 2 * math.pi); cs.set_source_rgba(1, 1, 1, 0.96 * hud_alpha); cs.fill()
             cg.arc(dx, dy, 8.5, 0, 2 * math.pi); cg.set_source_rgba(1, 1, 1, 0.80 * hud_alpha); cg.fill()
