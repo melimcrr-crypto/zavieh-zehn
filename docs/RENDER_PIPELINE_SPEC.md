@@ -14,6 +14,10 @@
 - هاله‌ی اپتیکال ۴ اکتاو ۳۲ بیتی (`Float32 Multi-Scale Gaussian Pyramid + Reinhard Soft-Knee + Filmic Micro-Dither`) بدون هیچ پله‌ی کوانتیزاسیون در تاریکی مطلق `#000000`.
 - لایه‌ی فوکوس‌کشی پیش‌زمینه (`Foreground DoF Pass-Through`) برای زوم‌های پیوسته‌ی دوربین از دل المان‌های نئونی، Whip-Pan با منحنی نمایی S-Curve، و رسم تدریجی خطوط (`Trim Paths`).
 
-## ۴. خروجی مستر GitHub Actions
+## ۴. موتور سینمایی `Studio v6.0 Sapphire Rim-Lit Glassmorphic UI` (`src/engine/sapphire_ui_core.py`)
+- ترکیب دولایه‌ی تمام‌رنگی (`Base Frosted Glass & 3D Volume` + `Emissive RGB Multi-Octave Bloom` + `Horizontal Anamorphic Lens Flare`) روی پس‌زمینه‌ی گرید آبی-سرمه‌ای با وینیت شعاعی (`#02050A`).
+- کاراکترهای سه‌بعدی بدون درز (`Jointless Volumetric 3D Fresnel Rim-Lit Character`) با انسداد کامل نور پشت (`OPERATOR_CLEAR Occlusion`)، بازتاب آینه‌ای کف زمین، کارت‌های شیشه‌ای با لبه‌ی لیزری متحرک (`Saber Rim`) و تایپوگرافی چندرنگ فارسی بدون جابه‌جایی حروف.
+
+## ۵. خروجی مستر GitHub Actions
 - تصویر: `1080×1920` • `60fps` • `libx264 -preset slow -crf 14 -profile:v high -level:v 4.2`.
 - صدا: `LOCKED_SIGNATURE_VOICE = Rasalgethi` + `ENSAN_FIR_24K` + `-0.34st` • `AAC 320kbps @ 48kHz Stereo`.

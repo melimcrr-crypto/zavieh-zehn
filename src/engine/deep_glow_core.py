@@ -543,3 +543,115 @@ def draw_cursor_arrow_neon(ctx, x: float, y: float, scale: float = 1.0, alpha: f
     ctx.set_source_rgba(1, 1, 1, alpha * 0.98)
     ctx.fill()
     ctx.restore()
+
+
+def draw_3d_wireframe_cube(
+    ctx, cx: float, cy: float, size: float,
+    rot_y: float = 0.65, tilt_x: float = 0.52,
+    alpha: float = 1.0, trim_p: float = 1.0, lw: float = 3.8
+):
+    """True 3D projected rotating neon wireframe cube for hypnotic 60fps Deep-Glow motion."""
+    if alpha <= 0.01 or trim_p <= 0.01 or size <= 1.0:
+        return
+    cy_r, sy_r = math.cos(rot_y), math.sin(rot_y)
+    cx_r, sx_r = math.cos(tilt_x), math.sin(tilt_x)
+
+    verts_2d = []
+    verts_z = []
+    for vx in (-1.0, 1.0):
+        for vy in (-1.0, 1.0):
+            for vz in (-1.0, 1.0):
+                # Rotate around Y, then tilt around X
+                x1 = vx * cy_r + vz * sy_r
+                z1 = -vx * sy_r + vz * cy_r
+                y2 = vy * cx_r - z1 * sx_r
+                z2 = vy * sx_r + z1 * cx_r
+                persp = 1.0 / (1.0 - z2 * 0.14)
+                verts_2d.append((cx + x1 * size * 0.68 * persp, cy + y2 * size * 0.68 * persp))
+                verts_z.append(z2)
+
+    edges = [
+        (0, 1), (0, 2), (1, 3), (2, 3),
+        (4, 5), (4, 6), (5, 7), (6, 7),
+        (0, 4), (1, 5), (2, 6), (3, 7),
+    ]
+    ctx.save()
+    ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+    ctx.set_line_join(cairo.LINE_JOIN_ROUND)
+    for idx_e, (i, j) in enumerate(edges):
+        ep = clamp(trim_p * 1.4 - (idx_e / 12.0) * 0.4)
+        if ep <= 0.01:
+            continue
+        x0, y0 = verts_2d[i]
+        x1, y1 = verts_2d[j]
+        z_avg = 0.5 * (verts_z[i] + verts_z[j])
+        depth_al = 0.46 + 0.54 * clamp((z_avg + 1.5) / 3.0)
+        ctx.new_path()
+        ctx.move_to(x0, y0)
+        ctx.line_to(x0 + (x1 - x0) * ep, y0 + (y1 - y0) * ep)
+        ctx.set_source_rgba(1, 1, 1, alpha * depth_al * 0.98)
+        ctx.set_line_width(lw * (0.78 + 0.30 * depth_al))
+        ctx.stroke()
+    ctx.restore()
+
+
+def draw_traveling_circuit_pulse(ctx, pts: list[tuple[float, float]], phase: float, seg_len: float = 58.0, alpha: float = 1.0):
+    """Draws a bright glowing photon packet gliding smoothly along a polyline path."""
+    if alpha <= 0.01 or len(pts) < 2:
+        return
+    lens = []
+    tot = 0.0
+    for k in range(len(pts) - 1):
+        d = math.hypot(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1])
+        lens.append(d)
+        tot += d
+    if tot <= 1.0:
+        return
+
+    u = phase % 1.0
+    pos = u * (tot + seg_len) - seg_len * 0.5
+    s0 = max(0.0, pos - seg_len * 0.5)
+    s1 = min(tot, pos + seg_len * 0.5)
+    if s1 <= s0 + 0.5:
+        return
+
+    ctx.save()
+    ctx.set_dash([])
+    ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+    acc = 0.0
+    for k, d in enumerate(lens):
+        if d <= 0.1:
+            continue
+        a0 = max(s0, acc)
+        a1 = min(s1, acc + d)
+        if a1 > a0:
+            f0 = (a0 - acc) / d
+            f1 = (a1 - acc) / d
+            x0 = pts[k][0] + (pts[k + 1][0] - pts[k][0]) * f0
+            y0 = pts[k][1] + (pts[k + 1][1] - pts[k][1]) * f0
+            x1 = pts[k][0] + (pts[k + 1][0] - pts[k][0]) * f1
+            y1 = pts[k][1] + (pts[k + 1][1] - pts[k][1]) * f1
+            ctx.move_to(x0, y0)
+            ctx.line_to(x1, y1)
+            ctx.set_source_rgba(1, 1, 1, alpha * 0.99)
+            ctx.set_line_width(7.8)
+            ctx.stroke()
+        acc += d
+    ctx.restore()
+
+
+def draw_neon_x_mark(ctx, cx: float, cy: float, size: float = 28.0, alpha: float = 1.0, pop_p: float = 1.0):
+    if alpha <= 0.01 or pop_p <= 0.01:
+        return
+    ctx.save()
+    ctx.set_dash([])
+    ctx.translate(cx, cy)
+    ctx.scale(pop_p, pop_p)
+    ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+    ctx.move_to(-size * 0.5, -size * 0.5); ctx.line_to(size * 0.5, size * 0.5)
+    ctx.move_to(size * 0.5, -size * 0.5); ctx.line_to(-size * 0.5, size * 0.5)
+    ctx.set_source_rgba(1, 1, 1, alpha * 0.98)
+    ctx.set_line_width(size * 0.28)
+    ctx.stroke()
+    ctx.restore()
+
