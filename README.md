@@ -39,6 +39,7 @@
 - `ep06_two_buttons_paradox.py` — معمای دو دکمه: ۱۰ میلیارد قطعی یا شیریاخطِ ۱۰۰ میلیاردی (`Release: ep06-two-buttons-paradox`)
 - `ep07_crab_bucket_law.py` — قانونِ سطلِ خرچنگ‌ها؛ چرا نزدیک‌ترین آدم‌ها گاهی نمی‌خوان پیشرفت کنی؟ (`Release: ep07-crab-bucket-law`)
 - `ep08_payment_anesthesia.py` — آمپولِ بی‌حسیِ پرداخت؛ چرا ۱ میلیون پولِ نقد قلبت رو به درد میاره ولی ۴ قسطِ اینترنتی نه؟ (`Release: ep08-payment-anesthesia`)
+- `ep08b_deepglow_motion_test.py` — نسخه‌ی موشن‌گرافیک پیوسته‌ی `Studio v5.0 Deep-Glow` اپیزود ۰۸ (بوم `#000000` بدون هیچ شلوغی باکس/HUD، هاله‌ی نوری ۴ اکتاو `32-bit Float Deep-Glow`، ترنزیشن زوم فوکوس‌کشی `8.5X DoF`، نیمرخ آناتومیک مغز، چشم مارپیچ و زیرنویس تمیز `y=1510`؛ `Release: ep08b-deepglow-motion-test`)
 
 ## مستندات مرجع مخزن
 - [`docs/PRODUCTION_METHODOLOGY.md`](docs/PRODUCTION_METHODOLOGY.md) — متدولوژی کامل تولید، صدای ثابت، قوانین کادرها و رندر ابری.
