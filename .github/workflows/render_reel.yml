@@ -27,7 +27,7 @@ permissions:
 jobs:
   render-60fps-reel:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 50
 
     steps:
       - name: Checkout Repository
@@ -40,7 +40,7 @@ jobs:
           if [ -n "$INPUT_EP" ]; then
             EP_PATH="$INPUT_EP"
           else
-            EP_PATH=$(ls -1 src/episodes/ep*.py | sort | tail -n 1)
+            EP_PATH=$(ls -1 src/episodes/ep*.py | sort -V | tail -n 1)
           fi
           STEM=$(basename "$EP_PATH" .py)
           INPUT_TAG="${{ github.event.inputs.release_tag }}"
@@ -124,6 +124,4 @@ jobs:
             qa_report/ffprobe_report.json
             qa_report/loudness_report.txt
             qa_report/alignment.json
-            qa_report/subtitle_strip_verify.png
-            qa_report/storyboard_12_scenes.png
-            qa_report/storyboard_24_shots.png
+            qa_report/*.png

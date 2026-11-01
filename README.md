@@ -41,6 +41,7 @@
 - `ep08_payment_anesthesia.py` — آمپولِ بی‌حسیِ پرداخت؛ چرا ۱ میلیون پولِ نقد قلبت رو به درد میاره ولی ۴ قسطِ اینترنتی نه؟ (`Release: ep08-payment-anesthesia`)
 - `ep08b_deepglow_motion_test.py` — نسخه‌ی موشن‌گرافیک پیوسته‌ی `Studio v5.0 Deep-Glow` اپیزود ۰۸ (بوم `#000000` بدون هیچ شلوغی باکس/HUD، هاله‌ی نوری ۴ اکتاو `32-bit Float Deep-Glow`، ترنزیشن زوم فوکوس‌کشی `8.5X DoF`، نیمرخ آناتومیک مغز، چشم مارپیچ و زیرنویس تمیز `y=1510`؛ `Release: ep08b-deepglow-motion-test`)
 - `ep09_sapphire_risk_control.py` — تله‌ی قطعیت؛ چرا همه‌چیز رو درست حساب می‌کنی ولی باز ضرر می‌کنی؟ (موتور `Studio v6.0 Sapphire Rim-Lit Glassmorphic UI & 3D Character` با کاراکتر سه‌بعدی نورپردازی‌شده‌ی فرنل، گرید آبی محو، کارت‌های شیشه‌ای لیزری، فِلِر آنامورفیک افقی و عقربه‌های ریسک؛ `Release: ep09-sapphire-risk-control`)
+- `ep10_ram_stack_heap_masterclass.py` — مسترکلاس آموزشی چنددقیقه‌ای `RAM`، `Stack` و `Heap` با نقاشیِ زنده‌ی قلم نوری (`Studio v6.1 Live Neon Stylus Sketching`) و بیان آرام و شمرده‌ی معلم‌وار (`slow_time_ratio=1.15` در `build_slow_masterclass_audio`؛ `Release: ep10-ram-stack-heap-masterclass`)
 
 ## مستندات مرجع مخزن
 - [`docs/PRODUCTION_METHODOLOGY.md`](docs/PRODUCTION_METHODOLOGY.md) — متدولوژی کامل تولید، صدای ثابت، قوانین کادرها و رندر ابری.

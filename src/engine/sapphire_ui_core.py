@@ -850,3 +850,354 @@ def draw_speedometer_gauge_card(
     cb.set_source_rgba(0.95, 0.98, 1.0, alpha * (0.98 if active_cyan else 0.65))
     cb.set_line_width(4.8); cb.stroke()
     cb.restore()
+
+
+# =============================================================================
+# STUDIO v6.1 — LIVE NEON SKETCHING & MEMORY ARCHITECTURE PRIMITIVES
+# =============================================================================
+def draw_neon_pen_nib(
+    cb, ce, tx: float, ty: float,
+    angle: float = -0.82,
+    col_mid: tuple = C_CYAN_MID,
+    col_core: tuple = C_CYAN_CORE,
+    alpha: float = 1.0,
+    scale: float = 1.0,
+):
+    """
+    Draws a sleek 3D Fresnel-lit Sapphire laser stylus + hot white-core 4-ray spark
+    right at the live drawing coordinate (tx, ty)!
+    """
+    if alpha <= 0.02:
+        return
+
+    # 1. Glowing hot pen-tip contact spark on emissive + base layers
+    ce.save()
+    rg = cairo.RadialGradient(tx, ty, 1.0, tx, ty, 24.0 * scale)
+    rg.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, alpha * 0.98)
+    rg.add_color_stop_rgba(0.35, col_core[0], col_core[1], col_core[2], alpha * 0.88)
+    rg.add_color_stop_rgba(1.0, col_mid[0], col_mid[1], col_mid[2], 0.0)
+    ce.set_source(rg)
+    ce.arc(tx, ty, 24.0 * scale, 0, 2 * math.pi)
+    ce.fill()
+    # 4-point optical star cross at nib tip
+    for dx, dy in ((18.0 * scale, 0.0), (0.0, 14.0 * scale)):
+        ce.move_to(tx - dx, ty - dy)
+        ce.line_to(tx + dx, ty + dy)
+    ce.set_source_rgba(1.0, 1.0, 1.0, alpha * 0.92)
+    ce.set_line_width(2.4 * scale)
+    ce.stroke()
+    ce.restore()
+
+    # 2. 3D Tilted Sapphire Stylus Body extending up-right from (tx, ty)
+    cb.save()
+    cb.translate(tx, ty)
+    cb.rotate(angle)
+    cb.scale(scale, scale)
+
+    # Tapered metallic-glass nib cone (0,0 -> 24, -7 .. 24, +7)
+    cb.move_to(0.0, 0.0)
+    cb.line_to(24.0, -6.8)
+    cb.line_to(24.0, 6.8)
+    cb.close_path()
+    cb.set_source_rgba(0.88, 0.97, 1.0, alpha * 0.96)
+    cb.fill_preserve()
+    cb.set_source_rgba(col_mid[0], col_mid[1], col_mid[2], alpha * 0.9)
+    cb.set_line_width(1.6)
+    cb.stroke()
+
+    # Cylindrical sapphire barrel (24..88)
+    rounded_rect_path(cb, 23.0, -8.2, 66.0, 16.4, 5.5)
+    lg_b = cairo.LinearGradient(23.0, -8.2, 23.0, 8.2)
+    lg_b.add_color_stop_rgba(0.0, col_core[0], col_core[1], col_core[2], alpha * 0.95)
+    lg_b.add_color_stop_rgba(0.45, 0.06, 0.14, 0.28, alpha * 0.98)
+    lg_b.add_color_stop_rgba(1.0, col_mid[0] * 0.7, col_mid[1] * 0.7, col_mid[2] * 0.7, alpha * 0.95)
+    cb.set_source(lg_b)
+    cb.fill_preserve()
+    cb.set_source_rgba(col_core[0], col_core[1], col_core[2], alpha * 0.85)
+    cb.set_line_width(1.8)
+    cb.stroke()
+
+    # Glowing neon collar ring on stylus
+    cb.move_to(32.0, -8.0); cb.line_to(32.0, 8.0)
+    cb.set_source_rgba(1.0, 1.0, 1.0, alpha * 0.92)
+    cb.set_line_width(2.6)
+    cb.stroke()
+    cb.restore()
+
+
+def draw_sketch_poly(
+    cb, ce, pts: list[tuple[float, float]], prog: float,
+    col_mid: tuple = C_CYAN_MID,
+    col_core: tuple = C_CYAN_CORE,
+    lw: float = 3.8,
+    alpha: float = 1.0,
+    show_pen: bool = True,
+    pen_scale: float = 0.95,
+) -> tuple[float, float]:
+    """
+    Progressively sketches a polyline `pts` from 0.0 -> `prog` with exact arc-length
+    interpolation and a live glowing neon stylus at the moving leading tip!
+    """
+    p = clamp(prog)
+    if p <= 0.002 or alpha <= 0.01 or len(pts) < 2:
+        return pts[0] if pts else (0.0, 0.0)
+
+    seg_lens = []
+    tot = 0.0
+    for i in range(len(pts) - 1):
+        d = math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1])
+        seg_lens.append(d)
+        tot += d
+    if tot <= 1e-4:
+        return pts[-1]
+
+    target = p * tot
+    drawn = [pts[0]]
+    acc = 0.0
+    tip = pts[-1]
+    for i, sl in enumerate(seg_lens):
+        if acc + sl >= target:
+            u = (target - acc) / max(1e-6, sl)
+            tx = pts[i][0] + (pts[i + 1][0] - pts[i][0]) * u
+            ty = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * u
+            drawn.append((tx, ty))
+            tip = (tx, ty)
+            break
+        else:
+            drawn.append(pts[i + 1])
+            acc += sl
+
+    for ctx_t, col, width, mul in (
+        (ce, col_mid, lw * 1.45, 0.85),
+        (cb, col_core, lw * 0.88, 0.95),
+        (cb, (0.94, 0.99, 1.0), lw * 0.42, 0.92),
+    ):
+        ctx_t.save()
+        ctx_t.set_line_cap(cairo.LINE_CAP_ROUND)
+        ctx_t.set_line_join(cairo.LINE_JOIN_ROUND)
+        ctx_t.move_to(drawn[0][0], drawn[0][1])
+        for px, py in drawn[1:]:
+            ctx_t.line_to(px, py)
+        ctx_t.set_source_rgba(col[0], col[1], col[2], alpha * mul)
+        ctx_t.set_line_width(width)
+        ctx_t.stroke()
+        ctx_t.restore()
+
+    if show_pen and 0.015 < p < 0.985:
+        pen_al = alpha * clamp(min(p / 0.08, (0.985 - p) / 0.09))
+        draw_neon_pen_nib(cb, ce, tip[0], tip[1], -0.78, col_mid, col_core, pen_al, pen_scale)
+
+    return tip
+
+
+def _sample_rounded_rect_pts(x: float, y: float, w: float, h: float, r: float) -> list[tuple[float, float]]:
+    r = min(r, w * 0.48, h * 0.48)
+    pts = []
+    corners = [
+        (x + w - r, y + r, -math.pi * 0.5, 0.0),
+        (x + w - r, y + h - r, 0.0, math.pi * 0.5),
+        (x + r, y + h - r, math.pi * 0.5, math.pi),
+        (x + r, y + r, math.pi, math.pi * 1.5),
+    ]
+    pts.append((x + r, y))
+    for cx, cy, a0, a1 in corners:
+        for k in range(7):
+            a = a0 + (a1 - a0) * (k / 6.0)
+            pts.append((cx + math.cos(a) * r, cy + math.sin(a) * r))
+    pts.append((x + r, y))
+    return pts
+
+
+def draw_sketch_glass_box(
+    cb, ce, x: float, y: float, w: float, h: float, r: float,
+    prog: float,
+    col_mid: tuple = C_CYAN_MID,
+    col_core: tuple = C_CYAN_CORE,
+    alpha: float = 1.0,
+    fill_alpha: float = 0.88,
+    laser_phase: float = 0.15,
+    show_pen: bool = True,
+    pen_scale: float = 0.92,
+):
+    """
+    Live-sketches a frosted Sapphire glass card/cell:
+      - 0.0 -> 1.0: Neon laser stylus draws the rounded perimeter stroke live!
+      - 0.30 -> 1.0: Frosted dark-obsidian glass interior smoothly materializes!
+      - >= 0.96: Signature travelling Saber corner highlight activates!
+    """
+    p = clamp(prog)
+    if p <= 0.002 or alpha <= 0.01:
+        return
+
+    fill_u = ease_out_cubic(clamp((p - 0.28) / 0.72))
+    if fill_u > 0.01 and fill_alpha > 0.01:
+        cb.save()
+        rounded_rect_path(cb, x, y, w, h, r)
+        lg = cairo.LinearGradient(x, y, x, y + h)
+        lg.add_color_stop_rgba(0.0, 0.065, 0.105, 0.165, alpha * fill_alpha * fill_u)
+        lg.add_color_stop_rgba(0.5, C_GLASS_BG[0], C_GLASS_BG[1], C_GLASS_BG[2], alpha * fill_alpha * fill_u)
+        lg.add_color_stop_rgba(1.0, 0.022, 0.036, 0.062, alpha * (fill_alpha + 0.05) * fill_u)
+        cb.set_source(lg)
+        cb.fill()
+        cb.restore()
+
+    if p < 0.985:
+        pts = _sample_rounded_rect_pts(x, y, w, h, r)
+        draw_sketch_poly(cb, ce, pts, p, col_mid, col_core, 3.4, alpha, show_pen, pen_scale)
+    else:
+        draw_laser_glass_card(cb, ce, x, y, w, h, r, alpha, col_mid, col_core, laser_phase, True, fill_alpha)
+
+
+def draw_sketch_bezier_wire(
+    cb, ce,
+    p0: tuple[float, float], p1: tuple[float, float],
+    p2: tuple[float, float], p3: tuple[float, float],
+    prog: float,
+    t_flow: float = 0.0,
+    col_mid: tuple = C_GREEN,
+    col_core: tuple = (0.78, 1.0, 0.88),
+    lw: float = 4.2,
+    alpha: float = 1.0,
+    arrow: bool = True,
+    show_pen: bool = True,
+):
+    """
+    Live-sketches a glowing curved pointer wire (e.g., Stack 0x7F40 -> Heap Object)
+    with live stylus + arrowhead + travelling photon data pulses once connected!
+    """
+    p = clamp(prog)
+    if p <= 0.002 or alpha <= 0.01:
+        return
+
+    pts = []
+    n_s = 40
+    for k in range(n_s + 1):
+        u = k / float(n_s)
+        iu = 1.0 - u
+        bx = (iu**3)*p0[0] + 3*(iu**2)*u*p1[0] + 3*iu*(u**2)*p2[0] + (u**3)*p3[0]
+        by = (iu**3)*p0[1] + 3*(iu**2)*u*p1[1] + 3*iu*(u**2)*p2[1] + (u**3)*p3[1]
+        pts.append((bx, by))
+
+    draw_sketch_poly(cb, ce, pts, p, col_mid, col_core, lw, alpha, show_pen, 0.88)
+
+    # Arrowhead at p3 once wire reaches destination
+    if arrow and p > 0.86:
+        au = ease_out_cubic(clamp((p - 0.86) / 0.14))
+        dx = pts[-1][0] - pts[-3][0]
+        dy = pts[-1][1] - pts[-3][1]
+        ang = math.atan2(dy, dx)
+        ah_len = 19.0 * au
+        a1 = (p3[0] - math.cos(ang - 0.48) * ah_len, p3[1] - math.sin(ang - 0.48) * ah_len)
+        a2 = (p3[0] - math.cos(ang + 0.48) * ah_len, p3[1] - math.sin(ang + 0.48) * ah_len)
+        for ctx_t, col, w_l in ((ce, col_mid, lw * 1.4), (cb, (0.95, 1.0, 0.98), lw * 0.85)):
+            ctx_t.save()
+            ctx_t.set_line_cap(cairo.LINE_CAP_ROUND)
+            ctx_t.move_to(a1[0], a1[1]); ctx_t.line_to(p3[0], p3[1]); ctx_t.line_to(a2[0], a2[1])
+            ctx_t.set_source_rgba(col[0], col[1], col[2], alpha * au)
+            ctx_t.set_line_width(w_l)
+            ctx_t.stroke()
+            ctx_t.restore()
+
+    # Travelling data-photon pulses along the pointer wire once connected!
+    if p >= 0.96 and t_flow > 0.0:
+        for ph_off in (0.0, 0.5):
+            uf = (t_flow * 0.58 + ph_off) % 1.0
+            iu = 1.0 - uf
+            px = (iu**3)*p0[0] + 3*(iu**2)*uf*p1[0] + 3*iu*(uf**2)*p2[0] + (uf**3)*p3[0]
+            py = (iu**3)*p0[1] + 3*(iu**2)*uf*p1[1] + 3*iu*(uf**2)*p2[1] + (uf**3)*p3[1]
+            ce.save()
+            rg = cairo.RadialGradient(px, py, 1.0, px, py, 16.0)
+            rg.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, alpha * 0.95)
+            rg.add_color_stop_rgba(0.45, col_core[0], col_core[1], col_core[2], alpha * 0.80)
+            rg.add_color_stop_rgba(1.0, col_mid[0], col_mid[1], col_mid[2], 0.0)
+            ce.set_source(rg)
+            ce.arc(px, py, 16.0, 0, 2 * math.pi)
+            ce.fill()
+            ce.restore()
+
+
+def draw_sketch_storage_cylinder(
+    cb, ce, cx: float, cy_top: float, rx: float, ry: float, h: float,
+    prog: float,
+    col_mid: tuple = C_AMBER,
+    col_core: tuple = (1.0, 0.90, 0.62),
+    alpha: float = 1.0,
+    show_pen: bool = True,
+):
+    """Live-sketches a 3D SSD / Hard-Drive permanent warehouse cylinder with platters!"""
+    p = clamp(prog)
+    if p <= 0.002 or alpha <= 0.01:
+        return
+
+    # Frosted glass body fill
+    fu = ease_out_cubic(clamp((p - 0.35) / 0.65))
+    if fu > 0.01:
+        cb.save()
+        cb.move_to(cx - rx, cy_top)
+        cb.line_to(cx - rx, cy_top + h)
+        cb.curve_to(cx - rx, cy_top + h + ry * 1.3, cx + rx, cy_top + h + ry * 1.3, cx + rx, cy_top + h)
+        cb.line_to(cx + rx, cy_top)
+        cb.close_path()
+        cb.set_source_rgba(0.08, 0.065, 0.035, alpha * 0.86 * fu)
+        cb.fill()
+        cb.restore()
+
+    # 1. Top ellipse (0..0.45)
+    top_pts = [(cx + math.cos(a) * rx, cy_top + math.sin(a) * ry) for a in np.linspace(0, 2 * math.pi, 33)]
+    draw_sketch_poly(cb, ce, top_pts, clamp(p / 0.45), col_mid, col_core, 3.4, alpha, show_pen and p < 0.45, 0.85)
+
+    # 2. Outer walls + bottom arc (0.40..0.82)
+    if p > 0.40:
+        body_pts = [(cx - rx, cy_top), (cx - rx, cy_top + h)]
+        for a in np.linspace(math.pi, 0.0, 19):
+            body_pts.append((cx + math.cos(a) * rx, cy_top + h + math.sin(a) * ry))
+        body_pts.append((cx + rx, cy_top))
+        draw_sketch_poly(cb, ce, body_pts, clamp((p - 0.40) / 0.42), col_mid, col_core, 3.4, alpha, show_pen and 0.40 <= p < 0.82, 0.85)
+
+    # 3. Internal disk platter rings (0.78..1.0)
+    if p > 0.78:
+        pu = clamp((p - 0.78) / 0.22)
+        for dy_r in (h * 0.36, h * 0.68):
+            ring_pts = [(cx + math.cos(a) * rx, cy_top + dy_r + math.sin(a) * ry) for a in np.linspace(math.pi * 0.92, math.pi * 0.08, 17)]
+            draw_sketch_poly(cb, ce, ring_pts, pu, col_mid, col_core, 2.4, alpha * 0.75, show_pen and dy_r > h * 0.5 and p < 0.985, 0.80)
+
+
+def draw_sketch_cpu_die(
+    cb, ce, cx: float, cy: float, size: float,
+    prog: float, t_pulse: float = 0.0, alpha: float = 1.0, show_pen: bool = True
+):
+    """Live-sketches a glowing 3D Sapphire CPU Processor package + pins + pulsing clock core!"""
+    p = clamp(prog)
+    if p <= 0.002 or alpha <= 0.01:
+        return
+    hs = size * 0.5
+    draw_sketch_glass_box(
+        cb, ce, cx - hs, cy - hs, size, size, 18,
+        clamp(p / 0.65), C_CYAN_MID, C_CYAN_CORE, alpha, 0.90, t_pulse * 0.2,
+        show_pen=(show_pen and p < 0.65), pen_scale=0.85
+    )
+    if p > 0.55:
+        pu = clamp((p - 0.55) / 0.45)
+        ihs = size * 0.27
+        draw_sketch_glass_box(
+            cb, ce, cx - ihs, cy - ihs, ihs * 2, ihs * 2, 10,
+            pu, (0.35, 0.85, 1.0), (0.85, 0.98, 1.0), alpha, 0.92, -t_pulse * 0.3,
+            show_pen=(show_pen and 0.65 <= p < 0.985), pen_scale=0.80
+        )
+        # 4x4 outer silicon contact pins
+        pin_len = 15.0 * ease_out_cubic(pu)
+        for side in range(4):
+            for k in range(4):
+                off = -size * 0.30 + k * (size * 0.20)
+                if side == 0:   x0, y0, x1, y1 = cx + off, cy - hs, cx + off, cy - hs - pin_len
+                elif side == 1: x0, y0, x1, y1 = cx + off, cy + hs, cx + off, cy + hs + pin_len
+                elif side == 2: x0, y0, x1, y1 = cx - hs, cy + off, cx - hs - pin_len, cy + off
+                else:           x0, y0, x1, y1 = cx + hs, cy + off, cx + hs + pin_len, cy + off
+                for ctx_t, col, lw in ((ce, C_CYAN_MID, 4.2), (cb, C_CYAN_CORE, 2.6)):
+                    ctx_t.save()
+                    ctx_t.set_line_cap(cairo.LINE_CAP_ROUND)
+                    ctx_t.move_to(x0, y0); ctx_t.line_to(x1, y1)
+                    ctx_t.set_source_rgba(col[0], col[1], col[2], alpha * 0.9)
+                    ctx_t.set_line_width(lw); ctx_t.stroke()
+                    ctx_t.restore()
+

@@ -256,6 +256,8 @@ def _norm_fa(s: str) -> str:
     return s
 
 
+_WM_CACHE = {}
+
 def align_script_lines(tightened_wav: str, script_lines: list[str], whisper_size: str = "medium") -> dict:
     """
     Extracts exact per-token (t_start, t_end) pairs for continuous sub-pixel RTL liquid-wipe subtitles!
@@ -268,7 +270,9 @@ def align_script_lines(tightened_wav: str, script_lines: list[str], whisper_size
     total_dur = len(audio_16k) / 16000.0
 
     from faster_whisper import WhisperModel
-    wm = WhisperModel(whisper_size, device="cpu", compute_type="int8")
+    if whisper_size not in _WM_CACHE:
+        _WM_CACHE[whisper_size] = WhisperModel(whisper_size, device="cpu", compute_type="int8")
+    wm = _WM_CACHE[whisper_size]
     segs, _ = wm.transcribe(
         audio_16k,
         language="fa",
@@ -970,3 +974,198 @@ def build_episode_audio(
     with open(align_json, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
     return meta
+
+
+def calibrate_slow_teacher_chunk(
+    raw_wav: str,
+    out_wav: str,
+    slow_time_ratio: float = 1.15,
+    tail_pad_sec: float = 0.72,
+) -> float:
+    """
+    Calibrates one chapter chunk into a warm, unhurried, slow-paced teacher cadence:
+      - Formant-locked -0.34st signature baritone + `slow_time_ratio` (~1.15x slower speaking tempo!)
+      - Preserves natural 0.45..0.55s pedagogical breathing pauses between sentences!
+    """
+    cal_wav = raw_wav.replace(".wav", "_slow48.wav")
+    has_rb = subprocess.call(["which", "rubberband"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+    if has_rb:
+        rb_tmp = raw_wav.replace(".wav", "_rb_slow.wav")
+        subprocess.check_call([
+            "rubberband", "-q",
+            "--pitch", str(LOCKED_PITCH_SEMITONES),
+            "--time", f"{slow_time_ratio:.4f}",
+            "--formant", raw_wav, rb_tmp
+        ])
+        subprocess.check_call(["ffmpeg", "-y", "-i", rb_tmp, "-ar", str(SR), "-ac", "1", "-c:a", "pcm_s16le", cal_wav], stderr=subprocess.DEVNULL)
+    else:
+        subprocess.check_call(["ffmpeg", "-y", "-i", raw_wav, "-ar", str(SR), "-ac", "1", "-c:a", "pcm_s16le", cal_wav], stderr=subprocess.DEVNULL)
+
+    with wave.open(cal_wav, "rb") as wf:
+        x = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
+
+    b_hp, a_hp = butter(2, 72.0 / (SR / 2), btype="high")
+    x = lfilter(b_hp, a_hp, x)
+
+    hop = int(0.010 * SR)
+    n_hops = len(x) // hop
+    frames = x[:n_hops * hop].reshape(n_hops, hop)
+    rms = np.sqrt(np.mean(frames ** 2, axis=1))
+    sil_thr = max(0.008, float(np.percentile(rms, 95)) * 0.06)
+    is_sil = rms < sil_thr
+    voiced_idxs = np.where(~is_sil)[0]
+    if len(voiced_idxs):
+        first_v = max(0, int(voiced_idxs[0]) - 3)
+        last_v = min(n_hops, int(voiced_idxs[-1]) + 5)
+        x = x[first_v * hop : last_v * hop]
+        is_sil = is_sil[first_v : last_v]
+        n_hops = len(is_sil)
+
+    # Gently cap only overly long >0.65s dead gaps down to a calm 0.48s teacher pause!
+    runs = []
+    cur_st = bool(is_sil[0]) if n_hops else False
+    r0 = 0
+    for i in range(1, n_hops):
+        if bool(is_sil[i]) != cur_st:
+            runs.append((cur_st, r0, i))
+            cur_st = bool(is_sil[i])
+            r0 = i
+    if n_hops:
+        runs.append((cur_st, r0, n_hops))
+
+    pieces = [np.zeros(int(0.06 * SR), dtype=np.float32)]
+    for st_sil, s0, s1 in runs:
+        seg = x[s0 * hop : s1 * hop]
+        if st_sil and (len(seg) / SR) > 0.65:
+            pieces.append(np.zeros(int(0.48 * SR), dtype=np.float32))
+        else:
+            pieces.append(seg)
+    pieces.append(np.zeros(int(tail_pad_sec * SR), dtype=np.float32))
+    out_x = np.concatenate(pieces)
+
+    env = lfilter(*butter(1, 12.0 / (SR / 2), btype="low"), np.abs(out_x)) + 1e-6
+    gain = np.where(env > 0.14, (0.14 / env) ** 0.38, 1.0)
+    out_x = np.tanh(out_x * gain * 1.45) * 0.83
+
+    with wave.open(out_wav, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(SR)
+        wf.writeframes((np.clip(out_x, -0.98, 0.98) * 32767).astype(np.int16).tobytes())
+    return len(out_x) / float(SR)
+
+
+def build_slow_masterclass_audio(
+    segments: list[tuple[str, str]],
+    sfx_cue_map: list,
+    work_dir: str,
+    voice_name: str = LOCKED_SIGNATURE_VOICE,
+    chunk_size: int = 10,
+    slow_time_ratio: float = 1.15,
+    final_tail_sec: float = 4.2,
+    whisper_size: str = "medium",
+) -> dict:
+    """
+    Multi-minute slow-paced educational masterclass audio builder:
+      - Synthesizes chapter chunks in locked `Rasalgethi` + 129-tap FIR
+      - Stretches cadence smoothly (`slow_time_ratio=1.15` -> calm, unhurried teacher explanation!)
+      - Aligns each chunk independently with Whisper (`0.00s` drift across 3-5 minutes!)
+      - Frees Whisper from RAM before video rendering begins!
+    """
+    import gc
+    os.makedirs(work_dir, exist_ok=True)
+    n_total = len(segments)
+    chunks = [segments[i:i + chunk_size] for i in range(0, n_total, chunk_size)]
+
+    all_vo_arrays = []
+    all_sub_lines = []
+    cum_sec = 0.0
+    total_words = 0
+
+    for ci, ch_segs in enumerate(chunks):
+        is_last = (ci == len(chunks) - 1)
+        ch_raw = os.path.join(work_dir, f"ch{ci:02d}_raw24.wav")
+        ch_cal = os.path.join(work_dir, f"ch{ci:02d}_slow48.wav")
+
+        spk_txt = " ".join(spk for spk, _ in ch_segs)
+        disp_lns = [disp for _, disp in ch_segs]
+
+        if ci > 0:
+            time.sleep(3.5)
+        print(f"[Masterclass Audio] Chapter {ci+1}/{len(chunks)} ({len(ch_segs)} lines)...", flush=True)
+        synthesize_gemini_tts(spk_txt, ch_raw, voice=voice_name)
+        ch_dur = calibrate_slow_teacher_chunk(
+            ch_raw, ch_cal,
+            slow_time_ratio=slow_time_ratio,
+            tail_pad_sec=(final_tail_sec if is_last else 0.78),
+        )
+        ch_align = align_script_lines(ch_cal, disp_lns, whisper_size=whisper_size)
+        total_words += ch_align["word_count"]
+
+        for ln in ch_align["lines"]:
+            ln_shifted = {
+                "full": ln["full"],
+                "tokens": ln["tokens"],
+                "start": round(ln["start"] + cum_sec, 3),
+                "end": round(ln["end"] + cum_sec, 3),
+                "times": [round(v + cum_sec, 3) for v in ln["times"]],
+                "ends": [round(v + cum_sec, 3) for v in ln["ends"]],
+            }
+            all_sub_lines.append(ln_shifted)
+
+        with wave.open(ch_cal, "rb") as wf:
+            ch_pcm = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
+        all_vo_arrays.append(ch_pcm)
+        cum_sec += len(ch_pcm) / float(SR)
+
+    # Free Whisper model from RAM before multiprocessing video workers fork!
+    _WM_CACHE.clear()
+    gc.collect()
+
+    full_vo = np.concatenate(all_vo_arrays)
+    full_vo_wav = os.path.join(work_dir, "full_slow_vo_48k.wav")
+    master_wav = os.path.join(work_dir, "master_stereo_48k.wav")
+    align_json = os.path.join(work_dir, "alignment.json")
+
+    with wave.open(full_vo_wav, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(SR)
+        wf.writeframes((np.clip(full_vo, -0.98, 0.98) * 32767).astype(np.int16).tobytes())
+
+    total_dur = round(len(full_vo) / float(SR), 3)
+    t_cues = {}
+    sfx_events = []
+    for item in sfx_cue_map:
+        if len(item) == 5:
+            cue_name, seg_idx, word_idx, sfx_kind, t_off = item
+        else:
+            cue_name, seg_idx, word_idx, sfx_kind = item
+            t_off = -0.02
+        tms = all_sub_lines[min(seg_idx, len(all_sub_lines) - 1)]["times"]
+        ts = float(tms[min(word_idx, len(tms) - 1)])
+        if cue_name:
+            t_cues[cue_name] = round(ts, 3)
+        if sfx_kind and sfx_kind != "none":
+            sfx_events.append({"type": sfx_kind, "t": max(0.0, ts + float(t_off))})
+
+    sfx_events.append({"type": "chime", "t": max(0.5, total_dur - final_tail_sec + 0.15), "freq": 587.33})
+    build_master_stereo_mix(full_vo_wav, master_wav, sfx_events)
+
+    net_wpm = round(total_words / max(0.1, (total_dur - final_tail_sec) / 60.0), 1)
+    meta = {
+        "mode": "slow_teacher_masterclass",
+        "slow_time_ratio": slow_time_ratio,
+        "net_wpm": net_wpm,
+        "word_count": total_words,
+        "total_dur": total_dur,
+        "t_cues": t_cues,
+        "sub_lines": all_sub_lines,
+        "master_wav": master_wav,
+        "align_json": align_json,
+    }
+    print(f"[Masterclass Audio] COMPLETE: {total_dur:.2f}s ({total_dur/60.0:.2f} min) @ calm {net_wpm} WPM!", flush=True)
+    with open(align_json, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    return meta
+
