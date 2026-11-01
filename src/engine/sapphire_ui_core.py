@@ -222,6 +222,10 @@ def get_multitone_persian_sprite(
 # =============================================================================
 # FULL-RGB 32-BIT FLOAT SAPPHIRE + ANAMORPHIC BLOOM COMPOSITOR
 # =============================================================================
+_WORK_A = np.empty((H, W, 3), dtype=np.float32)
+_WORK_B = np.empty((H, W, 3), dtype=np.float32)
+
+
 def composite_sapphire_frame(
     surf_base,
     surf_emissive,
@@ -239,21 +243,26 @@ def composite_sapphire_frame(
       3. Multi-Octave 32-Bit Float RGB Optical Bloom + Horizontal Anamorphic Flare (surf_emissive)
       4. Crisp Typography + Minimalist y=1515 Subtitle + Filmic Anti-Banding Micro-Dither
     """
-    bg = get_sapphire_grid_bg() * float(grid_strength)
+    bg = get_sapphire_grid_bg()
 
-    # Extract Cairo BGRA -> premultiplied float32 RGB + Alpha
+    # Extract Cairo BGRA -> in-place premultiplied float32 RGB + Alpha (zero extra full-res mallocs!)
     b_buf = np.frombuffer(surf_base.get_data(), dtype=np.uint8).reshape((H, W, 4))
-    b_rgb = b_buf[:, :, [2, 1, 0]].astype(np.float32)
-    b_a = b_buf[:, :, 3:4].astype(np.float32) * (1.0 / 255.0)
+    b_a = b_buf[:, :, 3:4].astype(np.float32)
+    np.multiply(b_a, -1.0 / 255.0, out=b_a)
+    np.add(b_a, 1.0, out=b_a)  # b_a now holds (1.0 - alpha)
 
-    # Alpha-over base glass & 3D shaded objects onto grid background
-    comp = bg * (1.0 - b_a) + b_rgb
+    np.multiply(bg, float(grid_strength), out=_WORK_A)
+    np.multiply(_WORK_A, b_a, out=_WORK_A)
+    _WORK_B[:, :, 0] = b_buf[:, :, 2]
+    _WORK_B[:, :, 1] = b_buf[:, :, 1]
+    _WORK_B[:, :, 2] = b_buf[:, :, 0]
+    np.add(_WORK_A, _WORK_B, out=_WORK_A)  # _WORK_A = comp (0..255)
 
     # Extract emissive layer + pre-paste emissive colored text highlights
     e_buf = np.frombuffer(surf_emissive.get_data(), dtype=np.uint8).reshape((H, W, 4))
-    e_rgb_u8 = e_buf[:, :, [2, 1, 0]].copy()
+    e_rgb_u8 = e_buf[:, :, [2, 1, 0]]
     if emissive_texts:
-        em_im = Image.fromarray(e_rgb_u8, mode="RGB").convert("RGBA")
+        em_im = Image.fromarray(e_rgb_u8.copy(), mode="RGB").convert("RGBA")
         for sp_em, cx, cy, al in emissive_texts:
             paste_center(em_im, sp_em, cx, cy, al)
         e_rgb_u8 = np.asarray(em_im.convert("RGB"), dtype=np.uint8)
@@ -263,16 +272,15 @@ def composite_sapphire_frame(
     h4, w4 = H // 4, W // 4
     h8, w8 = H // 8, W // 8
 
-    # Octave 1 (half-res) + Octave 2/3 & Horizontal Anamorphic Streak -> combined at half-res (3X faster!)
+    # Octave 1 (half-res C-SIMD) + Octave 2 (qtr-res C-SIMD) + Octave 3 & Anamorphic Streak (1/8-res)
     im_h = em_im_rgb.resize((w2, h2), Image.Resampling.BILINEAR)
     o1_h = np.asarray(im_h.filter(ImageFilter.GaussianBlur(radius=2.0)), dtype=np.float32) * (1.0 / 255.0)
 
-    a_qtr = np.asarray(im_h.resize((w4, h4), Image.Resampling.BILINEAR), dtype=np.float32) * (1.0 / 255.0)
-    o2_q = gaussian_filter(a_qtr, sigma=(4.4, 4.4, 0.0))
+    im_q = im_h.resize((w4, h4), Image.Resampling.BILINEAR)
+    o2_q = np.asarray(im_q.filter(ImageFilter.GaussianBlur(radius=4.4)), dtype=np.float32) * (1.0 / 255.0)
 
-    a_8 = np.asarray(im_h.resize((w8, h8), Image.Resampling.BILINEAR), dtype=np.float32) * (1.0 / 255.0)
+    a_8 = np.asarray(im_q.resize((w8, h8), Image.Resampling.BILINEAR), dtype=np.float32) * (1.0 / 255.0)
     o3_8 = gaussian_filter(a_8, sigma=(7.2, 7.2, 0.0))
-    # Signature Horizontal Anamorphic Cinema Flare on intense laser highlights!
     flare_src = np.maximum(0.0, a_8 - 0.24) * 1.40
     o_anam_8 = gaussian_filter(flare_src, sigma=(1.1, 10.5, 0.0))
 
@@ -286,19 +294,30 @@ def composite_sapphire_frame(
     wide_h_srgb = np.asarray(wide_h_im, dtype=np.float32) * (2.0 / 255.0)
     wide_h = wide_h_srgb * wide_h_srgb
 
-    # Soft-knee RGB optical glow computed at half-res (540x960) -> single SIMD upsample to 1080x1920!
     glow_lin_h = o1_h * 1.10 + wide_h * 1.22
     glow_knee_h = glow_lin_h / (1.0 + glow_lin_h * 0.98)
     glow_srgb_h_u8 = np.clip(np.sqrt(np.clip(glow_knee_h, 0.0, 1.0)) * (0.90 * 255.0), 0.0, 255.0).astype(np.uint8)
-    glow_srgb = np.asarray(Image.fromarray(glow_srgb_h_u8, mode="RGB").resize((W, H), Image.Resampling.BILINEAR), dtype=np.float32) * (1.0 / 255.0)
+    glow_u8 = np.asarray(Image.fromarray(glow_srgb_h_u8, mode="RGB").resize((W, H), Image.Resampling.BILINEAR), dtype=np.uint8)
 
-    e0 = e_rgb_u8.astype(np.float32) * (1.0 / 255.0)
-    em_total = 1.0 - (1.0 - np.clip(e0, 0.0, 1.0)) * (1.0 - glow_srgb)
+    # Single-pass in-place optical screen blend: out = 1 - (1 - comp_n)*(1 - e0)*(1 - glow_n)
+    np.multiply(_WORK_A, -1.0 / 255.0, out=_WORK_A)
+    np.add(_WORK_A, 1.0, out=_WORK_A)
+    np.clip(_WORK_A, 0.0, 1.0, out=_WORK_A)  # 1 - comp_n
 
-    # Optical screen blend emissive light over frosted glass scene!
-    comp_norm = np.clip(comp * (1.0 / 255.0), 0.0, 1.0)
-    out_f = (1.0 - (1.0 - comp_norm) * (1.0 - em_total)) * 255.0 + _DITHER
-    out_u8 = np.clip(out_f, 0.0, 255.0).astype(np.uint8)
+    _WORK_B[:, :, :] = e_rgb_u8
+    np.multiply(_WORK_B, -1.0 / 255.0, out=_WORK_B)
+    np.add(_WORK_B, 1.0, out=_WORK_B)
+    np.multiply(_WORK_A, _WORK_B, out=_WORK_A)
+
+    _WORK_B[:, :, :] = glow_u8
+    np.multiply(_WORK_B, -1.0 / 255.0, out=_WORK_B)
+    np.add(_WORK_B, 1.0, out=_WORK_B)
+    np.multiply(_WORK_A, _WORK_B, out=_WORK_A)  # _WORK_A = (1-comp_n)*(1-e0)*(1-glow_n)
+
+    np.multiply(_WORK_A, -255.0, out=_WORK_A)
+    np.add(_WORK_A, 255.0, out=_WORK_A)
+    np.add(_WORK_A, _DITHER, out=_WORK_A)
+    out_u8 = np.clip(_WORK_A, 0.0, 255.0).astype(np.uint8)
 
     if not sharp_texts and not sub_lines:
         return out_u8.tobytes()
@@ -1200,4 +1219,81 @@ def draw_sketch_cpu_die(
                     ctx_t.set_source_rgba(col[0], col[1], col[2], alpha * 0.9)
                     ctx_t.set_line_width(lw); ctx_t.stroke()
                     ctx_t.restore()
+
+
+def draw_sketch_diamond(
+    cb, ce, cx: float, cy: float, rx: float, ry: float,
+    prog: float,
+    col_mid: tuple = C_AMBER,
+    col_core: tuple = (1.0, 0.92, 0.65),
+    alpha: float = 1.0,
+    show_pen: bool = True,
+):
+    """Live-sketches a frosted Sapphire Flowchart Decision Diamond (`If / Else`) with stylus!"""
+    p = clamp(prog)
+    if p <= 0.002 or alpha <= 0.01:
+        return
+    pts = [(cx, cy - ry), (cx + rx, cy), (cx, cy + ry), (cx - rx, cy), (cx, cy - ry)]
+    fu = ease_out_cubic(clamp((p - 0.30) / 0.70))
+    if fu > 0.01:
+        cb.save()
+        cb.move_to(pts[0][0], pts[0][1])
+        for px, py in pts[1:]:
+            cb.line_to(px, py)
+        cb.close_path()
+        cb.set_source_rgba(0.055, 0.075, 0.115, alpha * 0.90 * fu)
+        cb.fill()
+        cb.restore()
+    draw_sketch_poly(cb, ce, pts, p, col_mid, col_core, 3.8, alpha, show_pen and p < 0.985, 0.85)
+
+
+def draw_sketch_circle_node(
+    cb, ce, cx: float, cy: float, r: float,
+    prog: float,
+    col_mid: tuple = C_CYAN_MID,
+    col_core: tuple = C_CYAN_CORE,
+    alpha: float = 1.0,
+    show_pen: bool = True,
+):
+    """Live-sketches a glowing circular Tree / Recursion / Graph node with frosted glass fill!"""
+    p = clamp(prog)
+    if p <= 0.002 or alpha <= 0.01:
+        return
+    fu = ease_out_cubic(clamp((p - 0.28) / 0.72))
+    if fu > 0.01:
+        cb.save()
+        cb.arc(cx, cy, r, 0, 2 * math.pi)
+        cb.set_source_rgba(0.045, 0.075, 0.125, alpha * 0.92 * fu)
+        cb.fill()
+        cb.restore()
+    pts = [(cx + math.cos(a) * r, cy + math.sin(a) * r) for a in np.linspace(-math.pi * 0.5, 1.5 * math.pi, 37)]
+    draw_sketch_poly(cb, ce, pts, p, col_mid, col_core, 3.6, alpha, show_pen and p < 0.985, 0.80)
+
+
+def draw_array_pointer_badge(
+    cb, ce, cx: float, y_tip: float, w: float, h: float,
+    label_txt: str, fonts: FontBank, sharp_texts: list,
+    col_mid: tuple = C_AMBER, col_rgb: tuple = (255, 196, 72),
+    alpha: float = 1.0, point_down: bool = True, laser_phase: float = 0.2,
+):
+    """Draws a glowing pointer tag (`Left`, `Right`, `Mid`, `i`) with a crisp triangle tip aimed at `y_tip`."""
+    if alpha <= 0.01:
+        return
+    tri_h = 18.0
+    by = (y_tip - tri_h - h) if point_down else (y_tip + tri_h)
+    bx = cx - w * 0.5
+    draw_laser_glass_card(cb, ce, bx, by, w, h, 14, alpha, col_mid, C_CYAN_CORE, laser_phase, False, 0.94)
+    # Glowing pointer triangle
+    base_y = (y_tip - tri_h) if point_down else (y_tip + tri_h)
+    for ctx_t, col, mul in ((ce, col_mid, 0.85), (cb, (0.95, 0.99, 1.0), 0.95)):
+        ctx_t.save()
+        ctx_t.move_to(cx - 12.0, base_y)
+        ctx_t.line_to(cx + 12.0, base_y)
+        ctx_t.line_to(cx, y_tip)
+        ctx_t.close_path()
+        ctx_t.set_source_rgba(col[0], col[1], col[2], alpha * mul)
+        ctx_t.fill()
+        ctx_t.restore()
+    sharp_texts.append((get_fitted_text_sprite(label_txt, fonts.bold_30, w - 22, (*col_rgb, 255)), cx, by + h * 0.5, alpha))
+
 

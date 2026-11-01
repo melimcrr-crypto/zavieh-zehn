@@ -1091,7 +1091,7 @@ def build_slow_masterclass_audio(
         disp_lns = [disp for _, disp in ch_segs]
 
         if ci > 0:
-            time.sleep(3.5)
+            time.sleep(5.2)
         print(f"[Masterclass Audio] Chapter {ci+1}/{len(chunks)} ({len(ch_segs)} lines)...", flush=True)
         synthesize_gemini_tts(spk_txt, ch_raw, voice=voice_name)
         ch_dur = calibrate_slow_teacher_chunk(
@@ -1150,7 +1150,10 @@ def build_slow_masterclass_audio(
             sfx_events.append({"type": sfx_kind, "t": max(0.0, ts + float(t_off))})
 
     sfx_events.append({"type": "chime", "t": max(0.5, total_dur - final_tail_sec + 0.15), "freq": 587.33})
+    del full_vo, all_vo_arrays
+    gc.collect()
     build_master_stereo_mix(full_vo_wav, master_wav, sfx_events)
+    gc.collect()
 
     net_wpm = round(total_words / max(0.1, (total_dur - final_tail_sec) / 60.0), 1)
     meta = {

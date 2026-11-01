@@ -14,10 +14,10 @@
 - هاله‌ی اپتیکال ۴ اکتاو ۳۲ بیتی (`Float32 Multi-Scale Gaussian Pyramid + Reinhard Soft-Knee + Filmic Micro-Dither`) بدون هیچ پله‌ی کوانتیزاسیون در تاریکی مطلق `#000000`.
 - لایه‌ی فوکوس‌کشی پیش‌زمینه (`Foreground DoF Pass-Through`) برای زوم‌های پیوسته‌ی دوربین از دل المان‌های نئونی، Whip-Pan با منحنی نمایی S-Curve، و رسم تدریجی خطوط (`Trim Paths`).
 
-## ۴. موتور سینمایی `Studio v6.0 / v6.1 Sapphire Glass-UI & Live Neon Sketching` (`src/engine/sapphire_ui_core.py`)
-- ترکیب دولایه‌ی تمام‌رنگی (`Base Frosted Glass & 3D Volume` + `Emissive RGB Multi-Octave Bloom` + `Horizontal Anamorphic Lens Flare`) روی پس‌زمینه‌ی گرید آبی-سرمه‌ای با وینیت شعاعی (`#02050A`).
+## ۴. موتور سینمایی `Studio v6.0 / v6.2 Sapphire Glass-UI & Live Algorithmic Sketching` (`src/engine/sapphire_ui_core.py`)
+- ترکیب دولایه‌ی تمام‌رنگی با بافرهای ازپیش‌تخصیص‌یافته بدون سربار حافظه (`_WORK_A`, `_WORK_B` + `C-SIMD GaussianBlur` — ۲ برابر سریع‌تر برای ویدیوهای ۱۰ دقیقه‌ای) روی پس‌زمینه‌ی گرید آبی-سرمه‌ای با وینیت شعاعی (`#02050A`).
 - کاراکترهای سه‌بعدی بدون درز (`Jointless Volumetric 3D Fresnel Rim-Lit Character`) با انسداد کامل نور پشت (`OPERATOR_CLEAR Occlusion`)، بازتاب آینه‌ای کف زمین، کارت‌های شیشه‌ای با لبه‌ی لیزری متحرک (`Saber Rim`) و تایپوگرافی چندرنگ فارسی بدون جابه‌جایی حروف.
-- **نقاشی زنده‌ی قلم نوری (`Studio v6.1 Live Neon Stylus Sketching`):** توابع `draw_neon_pen_nib`، `draw_sketch_glass_box`، `draw_sketch_bezier_wire`، `draw_sketch_storage_cylinder` و `draw_sketch_cpu_die` برای ترسیم زنده و مرحله‌به‌مرحله‌ی بلوک‌های حافظه، سلول‌های `RAM`، سینی‌های `Stack`، انبار `Heap` و پل پوینتر `0x7F40` به همراه `build_slow_masterclass_audio` برای ویدیوهای آموزشی چنددقیقه‌ای با سرعت کلام آرام و بدون شتاب‌زدگی (`--time 1.15`).
+- **نقاشی زنده‌ی قلم نوری و فلوچارت‌های الگوریتمی (`Studio v6.1 / v6.2`):** توابع `draw_neon_pen_nib`، `draw_sketch_glass_box`، `draw_sketch_diamond`، `draw_sketch_circle_node`، `draw_array_pointer_badge` و `draw_sketch_bezier_wire` به همراه `build_slow_masterclass_audio` برای ویدیوهای آموزشی بلند (`۵ تا ۱۰+ دقیقه`) با بیان آرام و بدون شتاب‌زدگی (`--time 1.15`).
 
 ## ۵. خروجی مستر GitHub Actions
 - تصویر: `1080×1920` • `60fps` • `libx264 -preset slow -crf 14 -profile:v high -level:v 4.2`.
