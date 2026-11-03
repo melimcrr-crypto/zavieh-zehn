@@ -28,6 +28,8 @@ from scipy.signal import butter, filtfilt
 import cairocffi as cairo
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
 from src.engine.render_core import (
     W, H, FontBank, fa, clamp, ease_out_cubic, ease_in_out_cubic, spring_pop, window_fade
 )
