@@ -320,12 +320,13 @@ def prepare_blogger_audio_and_alignment(raw_mp4: str, work_dir: str, whisper_mod
     kernel = np.ones(win, dtype=np.float64) / win
     vo_env = np.convolve(vo_abs, kernel, mode="same")
 
-    # Run faster-whisper word-level transcription
+    # Run faster-whisper word-level transcription directly on 16kHz float32 ndarray (bypasses PyAV!)
     from faster_whisper import WhisperModel
     print(f"[Studio v7.0] Running faster-whisper ({whisper_model_size}) word-timestamp alignment...", flush=True)
+    vo_16k = np.ascontiguousarray(vo_mono[::3], dtype=np.float32)
     wmodel = WhisperModel(whisper_model_size, device="cpu", compute_type="int8")
     segments, _ = wmodel.transcribe(
-        clean_vo_wav,
+        vo_16k,
         language="fa",
         word_timestamps=True,
         vad_filter=True,
