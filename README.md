@@ -43,6 +43,7 @@
 - `ep09_sapphire_risk_control.py` — تله‌ی قطعیت؛ چرا همه‌چیز رو درست حساب می‌کنی ولی باز ضرر می‌کنی؟ (موتور `Studio v6.0 Sapphire Rim-Lit Glassmorphic UI & 3D Character` با کاراکتر سه‌بعدی نورپردازی‌شده‌ی فرنل، گرید آبی محو، کارت‌های شیشه‌ای لیزری، فِلِر آنامورفیک افقی و عقربه‌های ریسک؛ `Release: ep09-sapphire-risk-control`)
 - `ep10_ram_stack_heap_masterclass.py` — مسترکلاس آموزشی چنددقیقه‌ای `RAM`، `Stack` و `Heap` با نقاشیِ زنده‌ی قلم نوری (`Studio v6.1 Live Neon Stylus Sketching`) و بیان آرام و شمرده‌ی معلم‌وار (`slow_time_ratio=1.15` در `build_slow_masterclass_audio`؛ `Release: ep10-ram-stack-heap-masterclass`)
 - `ep11_algorithmic_thinking_masterclass.py` — مسترکلاس جامع ~۱۰ دقیقه‌ایِ آموزش الگوریتم‌نویسی و طرز تفکر الگوریتمی با نقاشی زنده‌ی فلوچارت، لوزی تصمیم `If/Else`، منحنی‌های `Big-O`، جستجوی دودویی، مرتب‌سازی، دو اشاره‌گر، جدول هَش و بازگشت (`Studio v6.2`؛ `Release: ep11-algorithmic-thinking-masterclass`)
+- `ep12_denteye_aidite_blogger_edit.py` — تدوین حرفه‌ای بلاگری + موشن‌گرافیک شیشه‌ای و زیرنویس پویا (`Active-Word Highlight Pill`) برای ویدیوی جلو دوربین و معرفی اسکنر دندانپزشکی `Aidite Rapid 5` برند `DentEye / دنت‌آی` با حذف هوشمند سافت‌باکس، اصلاح چرخش ۹۰ درجه‌ی نرم‌افزار اسکن سه‌بعدی در مانیتور شیشه‌ای و مسترینگ صدای استودیویی (`Studio v7.0`؛ `Release: ep12-denteye-aidite-blogger-edit`)
 
 ## مستندات مرجع مخزن
 - [`docs/PRODUCTION_METHODOLOGY.md`](docs/PRODUCTION_METHODOLOGY.md) — متدولوژی کامل تولید، صدای ثابت، قوانین کادرها و رندر ابری.
