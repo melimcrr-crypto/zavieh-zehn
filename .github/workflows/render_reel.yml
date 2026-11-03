@@ -73,13 +73,14 @@ jobs:
           pip install -r requirements.txt
           python -c "from PIL import features; print('Raqm RTL support:', features.check('raqm')); assert features.check('raqm')"
 
-      - name: Fetch Vazirmatn Typography Weights
+      - name: Fetch Vazirmatn & Lalezar Display Typography Weights
         run: |
           mkdir -p fonts
           BASE="https://raw.githubusercontent.com/rastikerdar/vazirmatn/master/fonts/ttf"
-          for W in Light Regular Medium Bold ExtraBold; do
+          for W in Light Regular Medium Bold ExtraBold Black; do
             curl -fsSL "$BASE/Vazirmatn-${W}.ttf" -o "fonts/Vazirmatn-${W}.ttf"
           done
+          curl -fsSL "https://raw.githubusercontent.com/google/fonts/main/ofl/lalezar/Lalezar-Regular.ttf" -o "fonts/Lalezar-Regular.ttf"
           ls -lh fonts/
 
       - name: Synthesize Locked Rasalgethi Voice, Cinematic Score & Render 1080x1920 @ 60fps Master Reel
